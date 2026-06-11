@@ -1,0 +1,14 @@
+node_modules
+dist
+tmp
+test
+coverage
+.git
+.gitignore
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+README.md
+.env.example

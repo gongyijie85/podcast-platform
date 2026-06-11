@@ -1,7 +1,19 @@
 # Podcast Platform
 
-> ISBN → AI Podcast 一站式自动生产平台。  
+> ISBN → AI Podcast 一站式自动生产平台。
 > 完整 PRD 见 `docs/podcast-platform-prd.md`；架构见 `docs/podcast-platform-architecture.md`。
+
+## 部署
+
+本项目支持 **Vercel + Render 免费方案** 30 分钟从 0 上线。
+
+详细 step-by-step 指南：[docs/deploy.md](docs/deploy.md)
+
+- **frontend**: <https://vercel.com>（Hobby free tier）
+- **backend**: <https://render.com>（Free tier + Docker）
+
+> ⚠️ **生产环境注意**：Render free tier 文件系统是 ephemeral（重启即清空），
+> 导出的 MP3 需在 24h 内下载。详见 `docs/deploy.md` §5。
 
 ## 快速开始
 
