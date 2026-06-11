@@ -1,0 +1,75 @@
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant FE as Frontend (React)
+    participant API as Backend (NestJS)
+    participant Q as BullMQ + Redis
+    participant W as WebSocket Gateway
+    participant BK as BookApiAdapter
+    participant LL as LlmAdapter
+    participant TT as TtsAdapter
+    participant ST as Storage (MinIO)
+    participant FX as ffmpeg worker
+
+    U->>FE: 输入 ISBN 列表,点"导入"
+    FE->>FE: ISBN 正则校验 (isbn.ts)
+    FE->>API: POST /api/books/metadata {isbns}
+    API->>Q: enqueueMetadata(isbns, jobId)
+    Q-->>API: 任务ID
+    API-->>FE: {code:0, data:{jobId}}
+    Q->>BK: 拉取元数据 (适配器路由)
+    BK-->>Q: BookMetadata[]
+    Q->>API: 写库 ProjectBook
+    Q->>W: emit(projectId, stage=metadata, progress=25)
+    W-->>FE: WS push
+    FE-->>U: 展示书籍列表
+
+    U->>FE: 选音色 + BGM + 音量 + 渐变
+    FE->>API: POST /api/projects {books, voices, bgm}
+    API->>API: 持久化 Project + Script(空) + BgmConfig
+    API-->>FE: {projectId}
+
+    U->>FE: 点"开始生成"
+    FE->>API: POST /api/projects/:id/generate
+    API->>Q: enqueueScript(projectId)
+    API-->>FE: 202 Accepted
+
+    Q->>LL: generateScript(bookContext, prompt)
+    LL-->>Q: ScriptSegment[]
+    Q->>API: 写库 Script + ScriptSegment
+    Q->>W: emit(stage=script, progress=50)
+    W-->>FE: WS push
+
+    Q->>Q: enqueueTts(projectId) 串行入队
+    loop 每个 ScriptSegment
+        Q->>TT: synthesize(text, voiceId)
+        TT-->>Q: audioBuffer
+        Q->>ST: put(tts-seg-{idx}.mp3)
+        Q->>API: 写 AudioFile + 更新 startTime/endTime
+    end
+    Q->>W: emit(stage=tts, progress=75)
+    W-->>FE: WS push
+
+    Q->>Q: enqueueSubtitle(projectId)
+    Q->>API: 读 ScriptSegment 的 startTime/endTime
+    Q->>ST: put(srt, vtt)
+    Q->>W: emit(stage=subtitle, progress=90)
+    W-->>FE: WS push
+
+    Q->>Q: enqueueMix(projectId)
+    Q->>ST: get(tts-segs) + get(bgm-intro/body/outro)
+    Q->>FX: 拼接TTS,叠加BGM,渐入渐出,峰值-3dB
+    FX-->>Q: full-mix.mp3
+    Q->>ST: put(full-mix.mp3)
+    Q->>API: 写 AudioFile(mix_full)
+    Q->>W: emit(stage=mix, progress=100)
+    W-->>FE: WS push
+
+    FE-->>U: 自动跳"预览&导出页"
+    U->>FE: 播放/编辑脚本/导出
+    FE->>API: GET /api/projects/:id
+    API-->>FE: 完整成品
+    FE->>API: GET /api/projects/:id/export?format=zip
+    API->>ST: getSignedUrl
+    API-->>FE: 302 redirect
+    FE-->>U: 浏览器下载

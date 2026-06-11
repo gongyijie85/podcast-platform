@@ -1,0 +1,223 @@
+// Prisma schema for Podcast Platform
+// All models follow architecture §3.1 Class Diagram and §4.4 ER Diagram
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  phone        String?  @unique
+  passwordHash String   @map("password_hash")
+  nickname     String
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  projects     Project[]
+  preferences  UserPreference[]
+  errorLogs    ErrorLog[]
+
+  @@map("users")
+}
+
+model Project {
+  id           String   @id @default(uuid())
+  userId       String?  @map("user_id")
+  title        String
+  mode         String   // independent | merged
+  status       String   @default("draft") // draft|generating|done|failed|cancelled|partial
+  progress     Int      @default(0)
+  currentStage String?  @map("current_stage")
+  voiceVolume  Int      @default(80) @map("voice_volume")
+  subtitleOn   Boolean  @default(true) @map("subtitle_on")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user        User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  books       ProjectBook[]
+  scripts     Script[]
+  audioFiles  AudioFile[]
+  subtitles   SubtitleFile[]
+  voices      VoiceConfig[]
+  bgmConfigs  BgmConfig[]
+  jobs        Job[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("projects")
+}
+
+model ProjectBook {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  isbn       String
+  title      String
+  author     String
+  coverUrl   String?  @map("cover_url")
+  summary    String?  @db.Text
+  orderIndex Int      @default(0) @map("order_index")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_books")
+}
+
+model Script {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  version   Int      @default(1)
+  content   String   @db.Text  // TipTap JSON
+  rawText   String   @db.Text  @map("raw_text")
+  wordCount Int      @default(0) @map("word_count")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  segments ScriptSegment[]
+
+  @@index([projectId])
+  @@map("scripts")
+}
+
+model ScriptSegment {
+  id         String  @id @default(uuid())
+  scriptId   String  @map("script_id")
+  orderIndex Int     @map("order_index")
+  speaker    String  // host | guest
+  text       String  @db.Text
+  emotion    String
+  stage      String  // intro|introduce|interpret|review|suggest|closing
+  startTime  Int?    @map("start_time")
+  endTime    Int?    @map("end_time")
+
+  script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  @@index([scriptId, orderIndex])
+  @@map("script_segments")
+}
+
+model AudioFile {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  type       String   // tts_segment | mix_full | mix_intro | mix_body | mix_outro
+  storageKey String   @map("storage_key")
+  format     String   @default("mp3")
+  durationMs Int      @default(0) @map("duration_ms")
+  sizeBytes  BigInt   @default(0) @map("size_bytes")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, type])
+  @@map("audio_files")
+}
+
+model SubtitleFile {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  format     String   // srt | vtt
+  content    String   @db.Text
+  storageKey String   @map("storage_key")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, format])
+  @@map("subtitle_files")
+}
+
+model BgmTrack {
+  id         String @id @default(uuid())
+  name       String
+  category   String // 轻松|科技|人文|纪实
+  storageKey String @map("storage_key")
+  durationMs Int    @default(0) @map("duration_ms")
+
+  configs BgmConfig[]
+
+  @@map("bgm_tracks")
+}
+
+model BgmConfig {
+  id         String @id @default(uuid())
+  projectId  String @map("project_id")
+  segment    String // intro | body | outro
+  bgmTrackId String @map("bgm_track_id")
+  volume     Int    @default(50)
+  fadeInMs   Int    @default(1000) @map("fade_in_ms")
+  fadeOutMs  Int    @default(1000) @map("fade_out_ms")
+
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  bgmTrack BgmTrack @relation(fields: [bgmTrackId], references: [id])
+
+  @@index([projectId, segment])
+  @@map("bgm_configs")
+}
+
+model VoiceConfig {
+  id        String @id @default(uuid())
+  projectId String @map("project_id")
+  role      String // host | guest
+  voiceId   String @map("voice_id")
+  provider  String // volcengine | azure | mock
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, role])
+  @@map("voice_configs")
+}
+
+model Job {
+  id         String    @id @default(uuid())
+  projectId  String    @map("project_id")
+  type       String    // metadata|script|tts|subtitle|mix|export
+  status     String    @default("pending")
+  progress   Int       @default(0)
+  payload    Json?
+  error      String?   @db.Text
+  createdAt  DateTime  @default(now()) @map("created_at")
+  finishedAt DateTime? @map("finished_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, type])
+  @@index([status])
+  @@map("jobs")
+}
+
+model UserPreference {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  key    String
+  value  Json
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@map("user_preferences")
+}
+
+model ErrorLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  traceId   String?  @map("trace_id")
+  stage     String?
+  message   String   @db.Text
+  stack     String?  @db.Text
+  context   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([stage])
+  @@map("error_logs")
+}

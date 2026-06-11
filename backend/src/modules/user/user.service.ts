@@ -1,0 +1,40 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { ErrorCode } from '@shared/api';
+import type { UserDto } from '@shared/user';
+
+@Injectable()
+export class UserService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findById(id: string): Promise<UserDto> {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException({ code: ErrorCode.NOT_FOUND, message: 'User not found' });
+    }
+    return {
+      id: user.id,
+      email: user.email,
+      phone: user.phone,
+      nickname: user.nickname,
+      avatarUrl: user.avatarUrl,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    };
+  }
+
+  async setPreference(userId: string, key: string, value: unknown): Promise<void> {
+    await this.prisma.userPreference.upsert({
+      where: { userId_key: { userId, key } },
+      create: { userId, key, value: value as object },
+      update: { value: value as object },
+    });
+  }
+
+  async getPreference<T>(userId: string, key: string): Promise<T | null> {
+    const pref = await this.prisma.userPreference.findUnique({
+      where: { userId_key: { userId, key } },
+    });
+    return (pref?.value as T) ?? null;
+  }
+}

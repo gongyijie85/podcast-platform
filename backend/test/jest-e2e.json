@@ -1,0 +1,27 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.ts$": [
+      "ts-jest",
+      {
+        "tsconfig": {
+          "baseUrl": ".",
+          "paths": {
+            "@/*": ["src/*"],
+            "@shared/*": ["../shared/types/*"]
+          }
+        },
+        "isolatedModules": true
+      }
+    ]
+  },
+  "moduleNameMapper": {
+    "^@shared/(.*)$": "<rootDir>/../shared/types/$1",
+    "^nanoid$": "<rootDir>/test/__mocks__/nanoid.cjs",
+    "^nanoid/non-secure$": "<rootDir>/test/__mocks__/nanoid.cjs"
+  },
+  "transformIgnorePatterns": ["/node_modules/", "\\.pnp\\.[^\\/]+$"]
+}

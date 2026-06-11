@@ -1,0 +1,30 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ErrorCode = void 0;
+var ErrorCode;
+(function (ErrorCode) {
+    ErrorCode[ErrorCode["BAD_REQUEST"] = 10001] = "BAD_REQUEST";
+    ErrorCode[ErrorCode["UNAUTHORIZED"] = 10002] = "UNAUTHORIZED";
+    ErrorCode[ErrorCode["FORBIDDEN"] = 10003] = "FORBIDDEN";
+    ErrorCode[ErrorCode["NOT_FOUND"] = 10004] = "NOT_FOUND";
+    ErrorCode[ErrorCode["RATE_LIMITED"] = 10005] = "RATE_LIMITED";
+    ErrorCode[ErrorCode["EMAIL_REGISTERED"] = 20001] = "EMAIL_REGISTERED";
+    ErrorCode[ErrorCode["BAD_CREDENTIALS"] = 20002] = "BAD_CREDENTIALS";
+    ErrorCode[ErrorCode["TOKEN_EXPIRED"] = 20003] = "TOKEN_EXPIRED";
+    ErrorCode[ErrorCode["ISBN_INVALID"] = 30001] = "ISBN_INVALID";
+    ErrorCode[ErrorCode["METADATA_FETCH_FAILED"] = 30002] = "METADATA_FETCH_FAILED";
+    ErrorCode[ErrorCode["RETRY_EXCEEDED"] = 30003] = "RETRY_EXCEEDED";
+    ErrorCode[ErrorCode["LLM_FAILED"] = 40001] = "LLM_FAILED";
+    ErrorCode[ErrorCode["SCRIPT_LENGTH"] = 40002] = "SCRIPT_LENGTH";
+    ErrorCode[ErrorCode["CONTENT_REJECTED"] = 40003] = "CONTENT_REJECTED";
+    ErrorCode[ErrorCode["VOICE_NOT_FOUND"] = 50001] = "VOICE_NOT_FOUND";
+    ErrorCode[ErrorCode["TTS_FAILED"] = 50002] = "TTS_FAILED";
+    ErrorCode[ErrorCode["PREVIEW_LIMIT"] = 50003] = "PREVIEW_LIMIT";
+    ErrorCode[ErrorCode["JOB_NOT_FOUND"] = 60001] = "JOB_NOT_FOUND";
+    ErrorCode[ErrorCode["JOB_FINISHED"] = 60002] = "JOB_FINISHED";
+    ErrorCode[ErrorCode["CANCEL_FAILED"] = 60003] = "CANCEL_FAILED";
+    ErrorCode[ErrorCode["INTERNAL_ERROR"] = 90001] = "INTERNAL_ERROR";
+    ErrorCode[ErrorCode["THIRD_PARTY_TIMEOUT"] = 90002] = "THIRD_PARTY_TIMEOUT";
+    ErrorCode[ErrorCode["STORAGE_FAILED"] = 90003] = "STORAGE_FAILED";
+})(ErrorCode || (exports.ErrorCode = ErrorCode = {}));
+//# sourceMappingURL=api.js.map

@@ -1,0 +1,192 @@
+classDiagram
+    class User {
+        +string id
+        +string email
+        +string phone
+        +string passwordHash
+        +string nickname
+        +string avatarUrl
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+
+    class Project {
+        +string id
+        +string userId
+        +string title
+        +string mode
+        +string status
+        +number progress
+        +string currentStage
+        +DateTime createdAt
+        +DateTime updatedAt
+    }
+
+    class ProjectBook {
+        +string id
+        +string projectId
+        +string isbn
+        +string title
+        +string author
+        +string coverUrl
+        +string summary
+        +number orderIndex
+    }
+
+    class Script {
+        +string id
+        +string projectId
+        +string version
+        +string content
+        +string rawText
+        +number wordCount
+    }
+
+    class ScriptSegment {
+        +string id
+        +string scriptId
+        +number orderIndex
+        +string speaker
+        +string text
+        +string emotion
+        +string stage
+        +number startTime
+        +number endTime
+    }
+
+    class AudioFile {
+        +string id
+        +string projectId
+        +string type
+        +string storageKey
+        +string format
+        +number durationMs
+        +number sizeBytes
+    }
+
+    class SubtitleFile {
+        +string id
+        +string projectId
+        +string format
+        +string content
+        +string storageKey
+    }
+
+    class BgmTrack {
+        +string id
+        +string name
+        +string category
+        +string storageKey
+        +number durationMs
+    }
+
+    class BgmConfig {
+        +string id
+        +string projectId
+        +string segment
+        +string bgmTrackId
+        +number volume
+        +number fadeInMs
+        +number fadeOutMs
+    }
+
+    class VoiceConfig {
+        +string id
+        +string projectId
+        +string role
+        +string voiceId
+        +string provider
+    }
+
+    class Job {
+        +string id
+        +string projectId
+        +string type
+        +string status
+        +number progress
+        +string payload
+        +string error
+        +DateTime createdAt
+        +DateTime finishedAt
+    }
+
+    class UserPreference {
+        +string id
+        +string userId
+        +string key
+        +string value
+    }
+
+    class BookApiAdapter {
+        <<interface>>
+        +fetchByIsbn(isbn) BookMetadata
+        +fetchBatch(isbns) BookMetadata[]
+    }
+    class OpenLibraryAdapter {
+        -httpClient
+        +fetchByIsbn(isbn) BookMetadata
+        +fetchBatch(isbns) BookMetadata[]
+    }
+    class GoogleBooksAdapter {
+        +fetchByIsbn(isbn) BookMetadata
+    }
+
+    class LlmAdapter {
+        <<interface>>
+        +generateScript(bookContext, prompt) ScriptSegment[]
+    }
+    class DoubaoAdapter {
+        -apiKey
+        +generateScript(...) ScriptSegment[]
+    }
+
+    class TtsAdapter {
+        <<interface>>
+        +synthesize(text, voiceId) Buffer
+        +listVoices() Voice[]
+    }
+    class VolcengineTtsAdapter {
+        +synthesize(...) Buffer
+        +listVoices() Voice[]
+    }
+
+    class StorageAdapter {
+        <<interface>>
+        +put(key, buffer) string
+        +get(key) Buffer
+        +getSignedUrl(key, expires) string
+    }
+    class MinioStorageAdapter {
+        +put(...) string
+    }
+
+    class QueueService {
+        +enqueueMetadata(isbns) string
+        +enqueueScript(projectId) string
+        +enqueueTts(projectId) string
+        +enqueueMix(projectId) string
+        +cancelJob(jobId) void
+    }
+
+    class ProgressGateway {
+        -socketServer
+        +emitProgress(projectId, event) void
+    }
+
+    User "1" --> "*" Project
+    User "1" --> "*" UserPreference
+    Project "1" --> "*" ProjectBook
+    Project "1" --> "1" Script
+    Project "1" --> "*" AudioFile
+    Project "1" --> "*" SubtitleFile
+    Project "1" --> "1" VoiceConfig (host)
+    Project "1" --> "1" VoiceConfig (guest)
+    Project "1" --> "*" BgmConfig
+    Project "1" --> "*" Job
+    Script "1" --> "*" ScriptSegment
+    BgmConfig "1" --> "1" BgmTrack
+    OpenLibraryAdapter ..|> BookApiAdapter
+    GoogleBooksAdapter ..|> BookApiAdapter
+    DoubaoAdapter ..|> LlmAdapter
+    VolcengineTtsAdapter ..|> TtsAdapter
+    MinioStorageAdapter ..|> StorageAdapter

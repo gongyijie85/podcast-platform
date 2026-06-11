@@ -1,0 +1,40 @@
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+.vite/
+.turbo/
+coverage/
+*.log
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+.env.*.local
+.pnpm-store/
+.pnp.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test artifacts
+.nyc_output/
+coverage/
+junit.xml
+
+# Backend
+backend/prisma/migrations/dev*
+backend/storage/
+backend/tmp/
+backend/dist/
+
+# Frontend
+frontend/dist/
+frontend/.vite/
+
+# OS
+Thumbs.db

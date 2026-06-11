@@ -1,0 +1,181 @@
+{
+  "app": {
+    "name": "AI Podcast Platform",
+    "tagline": "ISBN → One-click two-host podcast"
+  },
+  "nav": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "book": "① Books",
+    "config": "② Config",
+    "generating": "③ Generate",
+    "preview": "④ Preview & Export",
+    "login": "Login",
+    "register": "Sign up",
+    "logout": "Logout",
+    "projects": "Projects",
+    "settings": "Settings"
+  },
+  "book": {
+    "title": "Select books",
+    "single": "Single",
+    "merged": "Merged",
+    "independent": "One episode per book",
+    "merge": "Merge into one episode",
+    "inputPlaceholder": "Paste ISBN list (newline/comma/space separated)",
+    "import": "Import",
+    "clear": "Clear",
+    "next": "Next: Config →",
+    "fetching": "Fetching metadata...",
+    "fetched": "Fetched {{count}}",
+    "failed": "Failed",
+    "retry": "Retry",
+    "remove": "Remove"
+  },
+  "config": {
+    "title": "Configuration",
+    "hostVoice": "Host voice",
+    "guestVoice": "Guest voice",
+    "preview": "Preview",
+    "bgmIntro": "Intro BGM",
+    "bgmBody": "Body BGM",
+    "bgmOutro": "Outro BGM",
+    "voiceVolume": "Voice volume",
+    "bgmVolume": "BGM volume",
+    "fadeIn": "Fade in",
+    "fadeOut": "Fade out",
+    "subtitle": "Subtitle",
+    "on": "On",
+    "off": "Off",
+    "prev": "← Back",
+    "next": "Next: Generate →"
+  },
+  "generating": {
+    "title": "Generating your podcast...",
+    "stage": {
+      "metadata": "Fetching book info",
+      "script": "Generating script",
+      "tts": "TTS synthesis",
+      "subtitle": "Building subtitles",
+      "mix": "Audio mix"
+    },
+    "cancel": "Cancel",
+    "cancelConfirm": "Cancel? Generated content will be saved as draft.",
+    "estimated": "Estimated"
+  },
+  "preview": {
+    "title": "Preview & Export",
+    "play": "Play",
+    "pause": "Pause",
+    "downloadMp3": "MP3",
+    "downloadSrt": "SRT",
+    "downloadVtt": "VTT",
+    "downloadTxt": "TXT",
+    "downloadPdf": "PDF",
+    "downloadZip": "All (ZIP)",
+    "regenerate": "Re-synthesize",
+    "newEpisode": "New episode"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "nickname": "Nickname",
+    "loginTitle": "Login",
+    "registerTitle": "Sign up",
+    "noAccount": "No account?",
+    "hasAccount": "Have an account?",
+    "submitLogin": "Login",
+    "submitRegister": "Sign up",
+    "success": "Success",
+    "failed": "Failed"
+  },
+  "common": {
+    "loading": "Loading...",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "back": "Back",
+    "save": "Save",
+    "seconds": "s",
+    "minutes": "m",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "close": "Close",
+    "search": "Search",
+    "submit": "Submit",
+    "next": "Next",
+    "prev": "Previous",
+    "finish": "Finish",
+    "startGenerate": "Start generation"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome back, {{name}}",
+    "newProject": "New project",
+    "noProjects": "No projects yet. Create your first podcast!",
+    "recentProjects": "Recent projects",
+    "viewAll": "View all"
+  },
+  "projects": {
+    "title": "My projects",
+    "search": "Search projects...",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this project? This cannot be undone.",
+    "empty": "No projects",
+    "openDetail": "Open detail"
+  },
+  "bookSearch": {
+    "title": "Book search",
+    "placeholder": "Enter ISBN or title (one per line)",
+    "search": "Search",
+    "useBook": "Use this book",
+    "noResults": "No matching books"
+  },
+  "projectCreate": {
+    "title": "Create project",
+    "steps": {
+      "book": "Books",
+      "script": "Script",
+      "voice": "Voice",
+      "bgm": "BGM",
+      "generate": "Generate"
+    },
+    "scriptMode": "Simple",
+    "segmentMode": "Segmented",
+    "hostText": "Host",
+    "guestText": "Guest",
+    "startGenerate": "Start generation",
+    "creating": "Creating...",
+    "generating": "Generating..."
+  },
+  "projectDetail": {
+    "title": "Project detail",
+    "books": "Books",
+    "script": "Script",
+    "voices": "Voices",
+    "bgm": "BGM",
+    "audio": "Audio",
+    "downloads": "Downloads",
+    "notGenerated": "Not generated yet",
+    "saveScript": "Save script",
+    "scriptSaved": "Script saved",
+    "regenerate": "Regenerate"
+  },
+  "settings": {
+    "title": "Settings",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "language": "Language",
+    "languageZh": "中文",
+    "languageEn": "English",
+    "logout": "Log out",
+    "logoutConfirm": "Are you sure you want to log out?"
+  },
+  "notFound": {
+    "title": "404",
+    "description": "Page not found",
+    "back": "Back to home"
+  }
+}

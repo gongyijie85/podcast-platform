@@ -1,0 +1,181 @@
+{
+  "app": {
+    "name": "AI 播客制作平台",
+    "tagline": "ISBN → 一键生成双人对话播客"
+  },
+  "nav": {
+    "home": "首页",
+    "dashboard": "仪表盘",
+    "book": "① 选书",
+    "config": "② 配置",
+    "generating": "③ 生成",
+    "preview": "④ 预览&导出",
+    "login": "登录",
+    "register": "注册",
+    "logout": "退出",
+    "projects": "我的项目",
+    "settings": "设置"
+  },
+  "book": {
+    "title": "选书",
+    "single": "单本模式",
+    "merged": "合并模式",
+    "independent": "逐本独立生成",
+    "merge": "合并为单期",
+    "inputPlaceholder": "粘贴 ISBN 列表（换行/逗号/空格分隔）",
+    "import": "导入",
+    "clear": "清空",
+    "next": "下一步：配置 →",
+    "fetching": "正在抓取元数据...",
+    "fetched": "已抓取 {{count}} 本",
+    "failed": "抓取失败",
+    "retry": "重试",
+    "remove": "移除"
+  },
+  "config": {
+    "title": "配置",
+    "hostVoice": "主持人音色",
+    "guestVoice": "嘉宾音色",
+    "preview": "试听",
+    "bgmIntro": "开场 BGM",
+    "bgmBody": "正片 BGM",
+    "bgmOutro": "片尾 BGM",
+    "voiceVolume": "人声音量",
+    "bgmVolume": "BGM 音量",
+    "fadeIn": "渐入",
+    "fadeOut": "渐出",
+    "subtitle": "字幕",
+    "on": "开",
+    "off": "关",
+    "prev": "← 上一步",
+    "next": "下一步：生成 →"
+  },
+  "generating": {
+    "title": "正在生成您的播客...",
+    "stage": {
+      "metadata": "拉取书籍信息",
+      "script": "生成脚本",
+      "tts": "TTS 语音合成",
+      "subtitle": "生成字幕",
+      "mix": "音频合成"
+    },
+    "cancel": "取消生成",
+    "cancelConfirm": "确认取消？已生成的内容将作为草稿保留。",
+    "estimated": "预计剩余"
+  },
+  "preview": {
+    "title": "预览 & 导出",
+    "play": "播放",
+    "pause": "暂停",
+    "downloadMp3": "下载 MP3",
+    "downloadSrt": "下载 SRT 字幕",
+    "downloadVtt": "下载 VTT 字幕",
+    "downloadTxt": "下载 TXT 脚本",
+    "downloadPdf": "下载 PDF 脚本",
+    "downloadZip": "下载全部 ZIP",
+    "regenerate": "重新合成音频",
+    "newEpisode": "新建一期"
+  },
+  "auth": {
+    "email": "邮箱",
+    "password": "密码",
+    "nickname": "昵称",
+    "loginTitle": "登录",
+    "registerTitle": "注册",
+    "noAccount": "还没有账号？",
+    "hasAccount": "已有账号？",
+    "submitLogin": "登录",
+    "submitRegister": "注册",
+    "success": "成功",
+    "failed": "失败"
+  },
+  "common": {
+    "loading": "加载中...",
+    "retry": "重试",
+    "cancel": "取消",
+    "confirm": "确认",
+    "back": "返回",
+    "save": "保存",
+    "seconds": "秒",
+    "minutes": "分",
+    "delete": "删除",
+    "edit": "编辑",
+    "create": "创建",
+    "close": "关闭",
+    "search": "搜索",
+    "submit": "提交",
+    "next": "下一步",
+    "prev": "上一步",
+    "finish": "完成",
+    "startGenerate": "开始生成"
+  },
+  "dashboard": {
+    "title": "仪表盘",
+    "welcome": "欢迎回来，{{name}}",
+    "newProject": "新建项目",
+    "noProjects": "还没有项目，立即创建第一个播客吧！",
+    "recentProjects": "最近项目",
+    "viewAll": "查看全部"
+  },
+  "projects": {
+    "title": "我的项目",
+    "search": "搜索项目...",
+    "delete": "删除",
+    "deleteConfirm": "确定删除此项目？此操作不可撤销。",
+    "empty": "暂无项目",
+    "openDetail": "查看详情"
+  },
+  "bookSearch": {
+    "title": "图书搜索",
+    "placeholder": "输入 ISBN 或书名（每行一个）",
+    "search": "搜索",
+    "useBook": "使用此书",
+    "noResults": "未找到匹配的图书"
+  },
+  "projectCreate": {
+    "title": "创建项目",
+    "steps": {
+      "book": "选书",
+      "script": "写脚本",
+      "voice": "选音色",
+      "bgm": "选 BGM",
+      "generate": "合成"
+    },
+    "scriptMode": "简单模式",
+    "segmentMode": "分镜模式",
+    "hostText": "主持人",
+    "guestText": "嘉宾",
+    "startGenerate": "开始生成",
+    "creating": "创建中...",
+    "generating": "生成中..."
+  },
+  "projectDetail": {
+    "title": "项目详情",
+    "books": "书目",
+    "script": "脚本",
+    "voices": "音色配置",
+    "bgm": "BGM 配置",
+    "audio": "音频",
+    "downloads": "下载",
+    "notGenerated": "尚未生成",
+    "saveScript": "保存脚本",
+    "scriptSaved": "脚本已保存",
+    "regenerate": "重新生成"
+  },
+  "settings": {
+    "title": "设置",
+    "theme": "主题",
+    "themeLight": "浅色",
+    "themeDark": "深色",
+    "language": "语言",
+    "languageZh": "中文",
+    "languageEn": "English",
+    "logout": "退出登录",
+    "logoutConfirm": "确定要退出登录吗？"
+  },
+  "notFound": {
+    "title": "404",
+    "description": "页面不存在",
+    "back": "返回首页"
+  }
+}
