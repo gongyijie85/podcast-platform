@@ -53,10 +53,14 @@ RUN pnpm install --frozen-lockfile --filter backend... --include-workspace-root 
 # only ships production dependencies, so it does not include the
 # pre-generated Prisma client that `prisma generate` produced earlier.
 #
-# Important: the generated client lives inside the pnpm virtual store at
-# `<workspace>/node_modules/.pnpm/@prisma+client@x.y.z_prisma@x.y.z/node_modules/.prisma/client/`
-# NOT in `backend/node_modules/.prisma/`. Copy from the actual location.
-COPY --from=builder /repo/node_modules/.prisma /deploy/backend/node_modules/.prisma
+# The prisma generate log explicitly says it wrote to
+#   `./../node_modules/.pnpm/@prisma+client@x.y.z_prisma@x.y.z/node_modules/@prisma/client`
+# and the generated engine artifacts land in the `.prisma/client/`
+# subdirectory of the .pnpm store, not at the workspace root.
+# We copy the entire `node_modules/` from the .pnpm package directory
+# of @prisma+client (which includes the generated .prisma/ folder)
+# and overlay it on the deployed layout.
+COPY --from=builder "/repo/node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/.prisma" /deploy/backend/node_modules/.prisma
 
 # ---- Stage 4: runtime ----
 FROM node:20-alpine AS runtime
