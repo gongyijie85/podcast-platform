@@ -48,18 +48,16 @@ export class MockBookMetadataAdapter implements BookApiAdapter {
   private readonly byIsbn: Map<string, BookMetadata>;
 
   constructor() {
+    // In dev, `process.cwd()` is the `backend/` directory.
+    // In the Docker container, the WORKDIR is `/app/backend/`.
+    // Both environments have `src/test/fixtures/` as a child of CWD.
     const fixturePath = path.resolve(
-      __dirname,
-      '..',
-      '..',
-      '..',
+      process.cwd(),
+      'src',
       'test',
       'fixtures',
       'book-metadata.fixture.json',
     );
-    // File lives at `backend/src/modules/book/adapters/`, fixture at
-    // `backend/src/test/fixtures/`. Three `..` hops walk:
-    // adapters → book → modules → src, then into `test/fixtures`.
     const raw = fs.readFileSync(fixturePath, 'utf8');
     const parsed = JSON.parse(raw) as FixtureRoot;
     if (!parsed.books || !Array.isArray(parsed.books)) {

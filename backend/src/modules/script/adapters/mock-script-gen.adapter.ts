@@ -90,18 +90,16 @@ export class MockScriptGenAdapter implements LlmAdapter {
   private readonly fixture: FixtureScriptGen;
 
   constructor() {
+    // In dev, `process.cwd()` is the `backend/` directory.
+    // In the Docker container, the WORKDIR is `/app/backend/`.
+    // Both have `src/test/fixtures/` as a child of CWD.
     const fixturePath = path.resolve(
-      __dirname,
-      '..',
-      '..',
-      '..',
+      process.cwd(),
+      'src',
       'test',
       'fixtures',
       'script-gen.fixture.json',
     );
-    // Note: this file lives at `backend/src/modules/script/adapters/` and
-    // the fixture lives at `backend/src/test/fixtures/`. The three `..`
-    // hops walk: adapters → script → modules → src, then into `test/fixtures`.
     const raw = fs.readFileSync(fixturePath, 'utf8');
     this.fixture = JSON.parse(raw) as FixtureScriptGen;
     if (!this.fixture.templates || !this.fixture.templates.default) {

@@ -27,18 +27,16 @@ export class MockTtsAdapter implements TtsAdapter {
   ];
 
   constructor() {
+    // In dev, `process.cwd()` is the `backend/` directory.
+    // In the Docker container, the WORKDIR is `/app/backend/`.
+    // Both have `src/test/fixtures/` as a child of CWD.
     const fixturePath = path.resolve(
-      __dirname,
-      '..',
-      '..',
-      '..',
+      process.cwd(),
+      'src',
       'test',
       'fixtures',
       'silence-1s.mp3',
     );
-    // This file lives at `backend/src/modules/tts/adapters/`, the fixture
-    // is at `backend/src/test/fixtures/`. Three `..` hops walk:
-    // adapters → tts → modules → src, then into `test/fixtures`.
     if (!fs.existsSync(fixturePath)) {
       throw new Error(
         `MockTtsAdapter: silence-1s.mp3 fixture not found at ${fixturePath}. ` +
