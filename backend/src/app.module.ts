@@ -20,6 +20,7 @@ import { StorageModule } from './modules/storage/storage.module';
 import { QueueModule } from './modules/queue/queue.module';
 import { WsModule } from './modules/ws/ws.module';
 import { ExportModule } from './modules/export/export.module';
+import { PipelineModule } from './modules/pipeline/pipeline.module';
 
 /**
  * Resolve the path to the optional `pino-pretty` binary. We wrap the lookup
@@ -76,6 +77,7 @@ function tryResolvePinoPrettyTarget():
     QueueModule,
     WsModule,
     ExportModule,
+    PipelineModule,
   ],
   controllers: [HealthController],
 })

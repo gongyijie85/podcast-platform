@@ -1,0 +1,37 @@
+{
+  "books": [
+    {
+      "isbn": "9787121362200",
+      "title": "人类简史",
+      "author": "尤瓦尔·赫拉利",
+      "coverUrl": "https://example.com/cover/sapiens.jpg",
+      "summary": "从认知革命、农业革命到科学革命，宏观回顾人类发展的关键节点与未来挑战，是一本跨学科的大历史读物。",
+      "publisher": "中信出版社",
+      "publishedDate": "2014-11-01",
+      "pageCount": 440,
+      "source": "mock"
+    },
+    {
+      "isbn": "9787506365437",
+      "title": "活着",
+      "author": "余华",
+      "coverUrl": "https://example.com/cover/to-live.jpg",
+      "summary": "一个普通中国家庭在时代洪流中的命运沉浮，朴素克制的笔触下是对生命韧性的最深礼赞。",
+      "publisher": "作家出版社",
+      "publishedDate": "2012-08-01",
+      "pageCount": 235,
+      "source": "mock"
+    },
+    {
+      "isbn": "9787544253994",
+      "title": "百年孤独",
+      "author": "加西亚·马尔克斯",
+      "coverUrl": "https://example.com/cover/cien-anos.jpg",
+      "summary": "马孔多镇布恩迪亚家族七代人的兴衰史，魔幻现实主义代表作，将拉丁美洲的历史与神话熔于一炉。",
+      "publisher": "南海出版公司",
+      "publishedDate": "2011-06-01",
+      "pageCount": 360,
+      "source": "mock"
+    }
+  ]
+}

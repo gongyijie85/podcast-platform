@@ -1,0 +1,52 @@
+{
+  "templates": {
+    "default": {
+      "stages": [
+        {
+          "stage": "opening",
+          "lines": [
+            { "speaker": "host", "text": "大家好，欢迎收听本期《AI 读书会》，我是主播小宇。", "emotion": "开心" },
+            { "speaker": "guest", "text": "大家好，我是本期嘉宾小鹿，今天我们来聊一本很有意思的书。", "emotion": "开心" }
+          ]
+        },
+        {
+          "stage": "intro",
+          "lines": [
+            { "speaker": "host", "text": "今天要介绍的这本书，在全球销量已经突破两千万册，是近十年最被广泛讨论的非虚构作品之一。", "emotion": "平和" },
+            { "speaker": "guest", "text": "没错，它横跨历史、生物、心理学，把人类走过的关键节点都串在了一起。", "emotion": "平和" }
+          ]
+        },
+        {
+          "stage": "interpret",
+          "lines": [
+            { "speaker": "host", "text": "书中反复强调一个观点：智人之所以能统治地球，靠的不是体能，而是讲故事的能力。", "emotion": "沉思" },
+            { "speaker": "guest", "text": "无论是宗教、国家，还是公司，本质上都是大家共同相信的虚构故事。这一点特别震撼。", "emotion": "激昂" }
+          ]
+        },
+        {
+          "stage": "review",
+          "lines": [
+            { "speaker": "host", "text": "它不是一本轻松的书，信息密度很大，但作者用了很多生活化的比喻，读起来其实不枯燥。", "emotion": "平和" },
+            { "speaker": "guest", "text": "对，尤其是农业革命那几章，我印象最深刻——我们以为是进步，其实也可能是陷阱。", "emotion": "感慨" }
+          ]
+        },
+        {
+          "stage": "suggest",
+          "lines": [
+            { "speaker": "host", "text": "如果你时间有限，建议先读认知革命和科学革命两章，会先建立一个大框架。", "emotion": "平和" },
+            { "speaker": "guest", "text": "对，最后一章关于 AI 的部分也很值得读，作者很早就预见到了今天的很多讨论。", "emotion": "感慨" }
+          ]
+        },
+        {
+          "stage": "closing",
+          "lines": [
+            { "speaker": "host", "text": "好，今天就先聊到这里。", "emotion": "平和" },
+            { "speaker": "guest", "text": "感谢大家收听，我们下期再见。", "emotion": "开心" }
+          ]
+        }
+      ]
+    }
+  },
+  "defaultTotalChars": 600,
+  "defaultEstimatedDurationSec": 120
+}

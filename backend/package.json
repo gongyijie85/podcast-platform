@@ -10,7 +10,7 @@
     "start:prod": "node dist/backend/src/main.js",
     "lint": "eslint . --ext .ts",
     "test": "jest --config jest.config.ts",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:e2e": "node -e \"process.env.JEST_E2E='1';const cp=require('child_process');const r=cp.spawnSync('node',['./node_modules/jest/bin/jest.js','--config','./test/jest-e2e.json'],{stdio:'inherit',env:process.env});process.exit(r.status||0)\"",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
