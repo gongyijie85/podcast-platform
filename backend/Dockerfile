@@ -17,6 +17,9 @@ COPY shared/ shared/
 RUN pnpm install --frozen-lockfile --filter backend... --include-workspace-root
 
 # ---- Stage 2: build (TS -> JS, Prisma generate) ----
+# Generate Prisma Client INSIDE this stage so the generated `.prisma/client`
+# directory exists on disk in the builder image. We then carry the
+# generated files into the prod-deps stage below.
 FROM node:20-alpine AS builder
 RUN apk add --no-cache python3 make g++ \
     && corepack enable \
@@ -25,6 +28,7 @@ WORKDIR /repo
 COPY --from=deps /repo/node_modules /repo/node_modules
 COPY --from=deps /repo/backend/node_modules /repo/backend/node_modules
 COPY . .
+# Generate Prisma client (writes to backend/node_modules/.prisma/client).
 RUN pnpm --filter backend prisma:generate
 RUN pnpm --filter backend build
 
@@ -33,6 +37,8 @@ RUN pnpm --filter backend build
 # `/deploy/backend/` with all transitive deps inlined under `node_modules/`
 # (no `.pnpm/` virtual store, no symlinks). This is what a single-process
 # container (Render) needs to run `node /app/dist/backend/src/main.js`.
+# CRITICAL: we overlay the previously generated Prisma client onto the
+# deployed node_modules so @prisma/client can find its engine at runtime.
 FROM node:20-alpine AS prod-deps
 RUN corepack enable \
     && corepack prepare pnpm@9.9.0 --activate
@@ -42,6 +48,11 @@ COPY backend/package.json backend/
 COPY shared/ shared/
 RUN pnpm install --frozen-lockfile --filter backend... --include-workspace-root \
     && pnpm --filter backend --prod deploy /deploy/backend
+# Overlay the generated Prisma client (from builder) onto the deployed
+# node_modules so @prisma/client runtime finds the engine. `pnpm deploy`
+# only ships production dependencies, so it does not include the
+# pre-generated Prisma client that `prisma generate` produced earlier.
+COPY --from=builder /repo/backend/node_modules/.prisma /deploy/backend/node_modules/.prisma
 
 # ---- Stage 4: runtime ----
 FROM node:20-alpine AS runtime
