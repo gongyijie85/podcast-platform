@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1.6
 
 # ---- Stage 1: deps (full install, layer-cached) ----
-FROM node:20-alpine AS deps
-RUN apk add --no-cache python3 make g++ \
+FROM node:20-bookworm-slim AS deps
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/* \
     && corepack enable \
     && corepack prepare pnpm@9.9.0 --activate
 WORKDIR /repo
@@ -12,8 +13,9 @@ COPY shared/ shared/
 RUN pnpm install --frozen-lockfile --filter backend... --include-workspace-root
 
 # ---- Stage 2: build (TS -> JS + prisma generate) ----
-FROM node:20-alpine AS builder
-RUN apk add --no-cache python3 make g++ \
+FROM node:20-bookworm-slim AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/* \
     && corepack enable \
     && corepack prepare pnpm@9.9.0 --activate
 WORKDIR /repo
@@ -24,12 +26,10 @@ RUN pnpm --filter backend prisma:generate
 RUN pnpm --filter backend build
 
 # ---- Stage 3: runtime ----
-# We copy the ENTIRE /repo tree from builder (including pnpm symlinks).
-# On Linux, pnpm symlinks are RELATIVE, so they survive a COPY into a
-# different root directory. The app runs from /app/backend/ and all
-# node_modules resolutions are intact.
-FROM node:20-alpine AS runtime
-RUN apk add --no-cache ffmpeg dumb-init openssl1.1-compat
+# Use bookworm-slim instead of Alpine to get libssl for Prisma engine.
+FROM node:20-bookworm-slim AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg tini \
+    && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 ENV PORT=3001
 WORKDIR /app
@@ -50,5 +50,5 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD wget -qO- http://127.0.0.1:3001/api/health || exit 1
 
-ENTRYPOINT ["dumb-init", "--"]
+ENTRYPOINT ["tini", "--"]
 CMD ["node", "dist/backend/src/main.js"]
