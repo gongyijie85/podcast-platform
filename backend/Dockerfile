@@ -29,7 +29,7 @@ RUN pnpm --filter backend build
 # different root directory. The app runs from /app/backend/ and all
 # node_modules resolutions are intact.
 FROM node:20-alpine AS runtime
-RUN apk add --no-cache ffmpeg dumb-init
+RUN apk add --no-cache ffmpeg dumb-init openssl1.1-compat
 ENV NODE_ENV=production
 ENV PORT=3001
 WORKDIR /app
