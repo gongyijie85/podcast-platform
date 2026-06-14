@@ -4,24 +4,24 @@ import type { PaginatedResult } from '@shared/api';
 
 export const projectApi = {
   async create(payload: CreateProjectPayload): Promise<ProjectDto> {
-    return request<ProjectDto>({ method: 'POST', url: '/api/projects', data: payload });
+    return request<ProjectDto>({ method: 'POST', url: '/projects', data: payload });
   },
   async get(id: string): Promise<ProjectDto> {
-    return request<ProjectDto>({ method: 'GET', url: `/api/projects/${id}` });
+    return request<ProjectDto>({ method: 'GET', url: `/projects/${id}` });
   },
   async update(id: string, payload: UpdateConfigPayload): Promise<ProjectDto> {
-    return request<ProjectDto>({ method: 'PATCH', url: `/api/projects/${id}`, data: payload });
+    return request<ProjectDto>({ method: 'PATCH', url: `/projects/${id}`, data: payload });
   },
   async list(page = 1, pageSize = 20): Promise<PaginatedResult<ProjectDto>> {
-    return request<PaginatedResult<ProjectDto>>({ method: 'GET', url: '/api/projects', params: { page, pageSize } });
+    return request<PaginatedResult<ProjectDto>>({ method: 'GET', url: '/projects', params: { page, pageSize } });
   },
   async generate(id: string): Promise<{ accepted: true; jobIds: Record<string, string> }> {
-    return request<{ accepted: true; jobIds: Record<string, string> }>({ method: 'POST', url: `/api/projects/${id}/generate` });
+    return request<{ accepted: true; jobIds: Record<string, string> }>({ method: 'POST', url: `/projects/${id}/generate` });
   },
   async cancel(id: string): Promise<{ cancelled: number }> {
-    return request<{ cancelled: number }>({ method: 'POST', url: `/api/projects/${id}/cancel` });
+    return request<{ cancelled: number }>({ method: 'POST', url: `/projects/${id}/cancel` });
   },
   async regenerate(id: string): Promise<{ accepted: true }> {
-    return request<{ accepted: true }>({ method: 'POST', url: `/api/projects/${id}/regenerate` });
+    return request<{ accepted: true }>({ method: 'POST', url: `/projects/${id}/regenerate` });
   },
 };

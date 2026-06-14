@@ -3,16 +3,16 @@ import type { BookMetadata, FetchMetadataResult, BgmTrackDto, BgmCategory } from
 
 export const bookApi = {
   async fetchMetadata(isbns: string[], projectId: string): Promise<FetchMetadataResult> {
-    return request<FetchMetadataResult>({ method: 'POST', url: '/api/books/metadata', data: { isbns, projectId } });
+    return request<FetchMetadataResult>({ method: 'POST', url: '/books/metadata', data: { isbns, projectId } });
   },
   async getJob(jobId: string): Promise<{ status: string }> {
-    return request<{ status: string }>({ method: 'GET', url: `/api/books/metadata/${jobId}` });
+    return request<{ status: string }>({ method: 'GET', url: `/books/metadata/${jobId}` });
   },
   async listBgm(): Promise<BgmTrackDto[]> {
-    return request<BgmTrackDto[]>({ method: 'GET', url: '/api/bgm/tracks' });
+    return request<BgmTrackDto[]>({ method: 'GET', url: '/bgm/tracks' });
   },
   async listBgmCategories(): Promise<BgmCategory[]> {
-    return request<BgmCategory[]>({ method: 'GET', url: '/api/bgm/categories' });
+    return request<BgmCategory[]>({ method: 'GET', url: '/bgm/categories' });
   },
 };
 

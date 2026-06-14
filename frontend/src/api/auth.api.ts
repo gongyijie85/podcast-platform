@@ -8,29 +8,29 @@ const USER = 'auth.user';
 
 export const authApi = {
   async login(payload: LoginPayload): Promise<AuthResponse> {
-    const r = await request<AuthResponse>({ method: 'POST', url: '/api/auth/login', data: payload });
+    const r = await request<AuthResponse>({ method: 'POST', url: '/auth/login', data: payload });
     this.persist(r);
     return r;
   },
   async register(payload: RegisterPayload): Promise<AuthResponse> {
-    const r = await request<AuthResponse>({ method: 'POST', url: '/api/auth/register', data: payload });
+    const r = await request<AuthResponse>({ method: 'POST', url: '/auth/register', data: payload });
     this.persist(r);
     return r;
   },
   async refresh(): Promise<AuthTokens> {
     const refresh = localStorageAdapter.get<string>(REFRESH);
     if (!refresh) throw new Error('No refresh token');
-    const r = await request<AuthTokens>({ method: 'POST', url: '/api/auth/refresh', data: { refreshToken: refresh } });
+    const r = await request<AuthTokens>({ method: 'POST', url: '/auth/refresh', data: { refreshToken: refresh } });
     localStorageAdapter.set(ACCESS, r.accessToken);
     localStorageAdapter.set(REFRESH, r.refreshToken);
     return r;
   },
   async me(): Promise<UserDto> {
-    return request<UserDto>({ method: 'GET', url: '/api/auth/me' });
+    return request<UserDto>({ method: 'GET', url: '/auth/me' });
   },
   async logout(): Promise<void> {
     try {
-      await apiClient.post('/api/auth/logout');
+      await apiClient.post('/auth/logout');
     } catch {
       /* ignore */
     }
