@@ -38,3 +38,5 @@ frontend/.vite/
 
 # OS
 Thumbs.db
+
+.vercel

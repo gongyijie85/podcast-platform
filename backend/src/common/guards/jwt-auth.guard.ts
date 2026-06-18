@@ -25,13 +25,12 @@ export class JwtAuthGuard implements CanActivate {
       ctx.getHandler(),
       ctx.getClass(),
     ]);
-    if (isPublic) return true;
-
     const req = ctx.switchToHttp().getRequest<Request>();
     const authHeader = (req.headers['authorization'] || req.headers['Authorization']) as
       | string
       | undefined;
     if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
+      if (isPublic) return true;
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
         message: 'Missing bearer token',
@@ -46,6 +45,7 @@ export class JwtAuthGuard implements CanActivate {
       (req as any).user = payload;
       return true;
     } catch (e: unknown) {
+      if (isPublic) return true;
       const msg = e instanceof Error ? e.message : 'Token invalid';
       throw new UnauthorizedException({
         code: ErrorCode.TOKEN_EXPIRED,

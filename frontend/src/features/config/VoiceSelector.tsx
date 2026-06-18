@@ -30,6 +30,10 @@ export function VoiceSelector({ role, value, onChange }: Props): JSX.Element {
         push(`音色加载失败: ${(e as Error).message}`, 'warning');
         // fallback to preset
         setVoices([
+          { id: '冰糖', name: '冰糖', provider: 'xiaomi', gender: 'female', description: '清亮自然', language: 'zh-CN' },
+          { id: '茉莉', name: '茉莉', provider: 'xiaomi', gender: 'female', description: '柔和亲切', language: 'zh-CN' },
+          { id: '苏打', name: '苏打', provider: 'xiaomi', gender: 'male', description: '轻松对谈', language: 'zh-CN' },
+          { id: '白桦', name: '白桦', provider: 'xiaomi', gender: 'male', description: '深度书评', language: 'zh-CN' },
           { id: 'BV001_streaming', name: '沉稳男声', provider: 'volcengine', gender: 'male', description: '新闻播报', language: 'zh-CN' },
           { id: 'BV002_streaming', name: '活力女声', provider: 'volcengine', gender: 'female', description: '轻松活泼', language: 'zh-CN' },
           { id: 'BV005_streaming', name: '知性男声', provider: 'volcengine', gender: 'male', description: '学术', language: 'zh-CN' },

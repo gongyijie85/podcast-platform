@@ -5,6 +5,7 @@ import { nanoid } from 'nanoid';
 import { QUEUE_NAMES, Stage } from './constants';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { ProgressEvent } from '@shared/job';
+import type { RegenerateProjectPayload } from '@shared/project';
 
 @Injectable()
 export class QueueService {
@@ -40,7 +41,10 @@ export class QueueService {
    * Enqueue the 4-stage pipeline for a project: script → tts → subtitle → mix.
    * Stage transitions are done in the processors via `enqueueNext`.
    */
-  async enqueuePipeline(projectId: string): Promise<{ jobIds: Record<Stage, string> }> {
+  async enqueuePipeline(
+    projectId: string,
+    scriptOptions: RegenerateProjectPayload = {},
+  ): Promise<{ jobIds: Record<Stage, string> }> {
     const ids: Record<Stage, string> = {
       metadata: '',
       script: `script-${projectId}-${nanoid(6)}`,
@@ -49,13 +53,13 @@ export class QueueService {
       mix: `mix-${projectId}-${nanoid(6)}`,
     };
     // Start from script; metadata is handled separately at /api/books/metadata.
-    await this.scriptQ.add('generateScript', { projectId }, { jobId: ids.script });
+    await this.scriptQ.add('generateScript', { projectId, scriptOptions }, { jobId: ids.script });
     return { jobIds: ids };
   }
 
-  async enqueueScript(projectId: string): Promise<string> {
+  async enqueueScript(projectId: string, scriptOptions: RegenerateProjectPayload = {}): Promise<string> {
     const id = `script-${projectId}-${nanoid(6)}`;
-    await this.scriptQ.add('generateScript', { projectId }, { jobId: id });
+    await this.scriptQ.add('generateScript', { projectId, scriptOptions }, { jobId: id });
     return id;
   }
 

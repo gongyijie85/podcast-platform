@@ -1,5 +1,35 @@
 import PDFDocument from 'pdfkit';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { ScriptDto, ScriptSegmentDto } from '@shared/script';
+
+const CJK_FONT_NAME = 'NotoSansCJK';
+
+const CJK_FONT_CANDIDATES = [
+  process.env.PDF_FONT_PATH,
+  'C:\\Windows\\Fonts\\Noto Sans SC (TrueType).otf',
+  'C:\\Windows\\Fonts\\NotoSansSC-VF.ttf',
+  'C:\\Windows\\Fonts\\msyh.ttc',
+  '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+  '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc',
+  '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+  '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+].filter(Boolean) as string[];
+
+function resolveCjkFont(): string | null {
+  for (const candidate of CJK_FONT_CANDIDATES) {
+    const fontPath = path.resolve(candidate);
+    if (fs.existsSync(fontPath)) return fontPath;
+  }
+  return null;
+}
+
+function useReadableFont(doc: PDFKit.PDFDocument): void {
+  const fontPath = resolveCjkFont();
+  if (!fontPath) return;
+  doc.registerFont(CJK_FONT_NAME, fontPath);
+  doc.font(CJK_FONT_NAME);
+}
 
 export async function generateScriptPdf(script: ScriptDto): Promise<Buffer> {
   return new Promise<Buffer>((resolve, reject) => {
@@ -9,6 +39,7 @@ export async function generateScriptPdf(script: ScriptDto): Promise<Buffer> {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', (e: Error) => reject(e));
 
+    useReadableFont(doc);
     doc.fontSize(20).text('Podcast Script', { align: 'center' });
     doc.moveDown(0.5);
     doc.fontSize(10).fillColor('#666').text(`Version ${script.version} · ${script.wordCount} 字`);

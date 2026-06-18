@@ -10,8 +10,8 @@
  * IMPORTANT: These are `Symbol` tokens (not strings) to avoid accidental
  * collisions with v1.0's string-keyed Nest providers in the book / script /
  * tts / storage modules. Each module's real adapter (OpenLibraryAdapter,
- * DoubaoAdapter, etc.) is bound to its OWN class-based token and remains
- * untouched by this increment.
+ * OpenAI-compatible LLM adapter, etc.) is bound to its OWN class-based token
+ * and remains untouched by this increment.
  */
 
 export const BOOK_ADAPTER = Symbol('PIPELINE_BOOK_ADAPTER');

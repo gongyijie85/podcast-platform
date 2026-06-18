@@ -28,7 +28,7 @@ RUN pnpm --filter backend build
 # ---- Stage 3: runtime ----
 # Use bookworm-slim instead of Alpine to get libssl for Prisma engine.
 FROM node:20-bookworm-slim AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg tini \
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg tini fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 ENV PORT=3001

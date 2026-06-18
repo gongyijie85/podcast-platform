@@ -62,5 +62,5 @@ export interface PipelineBookMetadata {
   author: string;
   coverUrl: string;
   summary: string;
-  source: 'openlibrary' | 'googlebooks' | 'mock';
+  source: 'openlibrary' | 'googlebooks' | 'mock' | 'bookrank';
 }

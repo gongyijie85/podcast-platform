@@ -15,6 +15,7 @@ import {
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import { bgmApi } from '../../api/bgm.api';
+import { ENV } from '../../constants/env';
 import { useConfigStore } from '../../store/config.store';
 import { useUiStore } from '../../store/ui.store';
 import { formatMs } from '../../utils/format';
@@ -56,6 +57,8 @@ const CATEGORIES: Array<{ key: string; label: string }> = [
 export function BGMPicker({ value, segment, onChange, volume = 30, onVolumeChange }: Props): JSX.Element {
   const tracks = useConfigStore((s) => s.bgmTracks);
   const setTracks = useConfigStore((s) => s.setBgm);
+  const recentBgmTrackIds = useConfigStore((s) => s.recentBgmTrackIds);
+  const pushRecentBgm = useConfigStore((s) => s.pushRecentBgm);
   const push = useUiStore((s) => s.push);
   const [category, setCategory] = useState<string>('all');
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
@@ -81,7 +84,16 @@ export function BGMPicker({ value, segment, onChange, volume = 30, onVolumeChang
     }
   }, [tracks.length, setTracks]);
 
-  const visible = category === 'all' ? tracks : tracks.filter((t) => t.category === category);
+  const visible = (category === 'all' ? tracks : tracks.filter((t) => t.category === category))
+    .slice()
+    .sort((a, b) => {
+      const ai = recentBgmTrackIds.indexOf(a.id);
+      const bi = recentBgmTrackIds.indexOf(b.id);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
 
   const preview = (t: BgmTrackDto): void => {
     if (previewing === t.id) {
@@ -89,12 +101,13 @@ export function BGMPicker({ value, segment, onChange, volume = 30, onVolumeChang
       setPreviewing(null);
       return;
     }
-    if (!t.url) {
+    const audioUrl = normalizeAudioUrl(t.url);
+    if (!audioUrl) {
       push(`「${t.name}」暂无试听地址`, 'info');
       return;
     }
     audio?.pause();
-    const a = new Audio(t.url);
+    const a = new Audio(audioUrl);
     a.onended = () => setPreviewing(null);
     a.onerror = () => {
       setPreviewing(null);
@@ -130,7 +143,14 @@ export function BGMPicker({ value, segment, onChange, volume = 30, onVolumeChang
           ))}
         </ToggleButtonGroup>
 
-        <Stack spacing={1}>
+        <Stack
+          spacing={1}
+          sx={{
+            maxHeight: 260,
+            overflowY: 'auto',
+            pr: 0.5,
+          }}
+        >
           {visible.length === 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
               暂无 BGM
@@ -153,7 +173,10 @@ export function BGMPicker({ value, segment, onChange, volume = 30, onVolumeChang
                   cursor: 'pointer',
                   '&:hover': { bgcolor: selected ? 'primary.50' : 'grey.50' },
                 }}
-                onClick={() => onChange(t.id)}
+                  onClick={() => {
+                    onChange(t.id);
+                    pushRecentBgm(t.id);
+                  }}
               >
                 <Tooltip title={previewing === t.id ? '停止' : '试听'}>
                   <IconButton
@@ -171,6 +194,7 @@ export function BGMPicker({ value, segment, onChange, volume = 30, onVolumeChang
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2" fontWeight={selected ? 600 : 500} noWrap>
                     {t.name}
+                    {recentBgmTrackIds.includes(t.id) ? ' · 最近使用' : ''}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {t.category} · {formatMs(t.durationMs)}
@@ -199,4 +223,13 @@ export function BGMPicker({ value, segment, onChange, volume = 30, onVolumeChang
       </CardContent>
     </Card>
   );
+}
+
+function normalizeAudioUrl(url?: string): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+  if (url.startsWith('/api')) {
+    return `${ENV.apiBaseUrl.replace(/\/api$/, '')}${url}`;
+  }
+  return url;
 }

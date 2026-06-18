@@ -51,6 +51,10 @@ export class ProgressGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   async emit(event: ProgressEvent): Promise<void> {
     const room = this.roomFor(event.projectId);
+    if (!this.server) {
+      this.logger.debug(`skip progress emit before websocket server is ready: ${event.stage} ${event.progress}%`);
+      return;
+    }
     this.server.to(room).emit('project.progress', event);
     this.server.to(room).emit(`project.${event.stage}`, event);
     this.logger.debug(

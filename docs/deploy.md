@@ -43,6 +43,12 @@ git push origin main
    - `PORT` = `3001`
    - `CORS_ORIGINS` = `https://<你的>.vercel.app,http://localhost:5173`
    - `JWT_SECRET` = 点 **Generate Value**（Render 自动生成 32+ 字符）
+   - `DATABASE_URL` = 你的 PostgreSQL 连接串
+   - `LLM_PROVIDER` = `mimo`
+   - `LLM_API_KEY` = Token Plan / Xiaomi MiMo key
+   - `LLM_ENDPOINT` = `https://token-plan-sgp.xiaomimimo.com/v1`
+   - `LLM_MODEL` = `mimo-v2.5-pro`
+   - `BOOKRANK_API_BASE_URL` = `https://bookrank-ckml.onrender.com`
 10. 点 **Create Web Service** → 等 5~10 分钟构建 → 拿到 `https://<xxx>.onrender.com`
 
 > ⚠️ **第一次构建要 5~10 分钟**，因为要从头 `pnpm install` 全部依赖（node_modules 缓存层命中后第二次 < 2 分钟）。
@@ -69,6 +75,14 @@ git push origin main
 Render free tier 15 分钟无活动后休眠，下次访问需要 30 秒冷启动。
 **前端加 loading state**：登录页 + 主流程页面要有"唤醒中…"loading，
 时间 < 30s 用户基本能接受；超过 60s 再提示刷新。
+
+想降低冷启动频率，可以用 UptimeRobot、cron-job.org 或 GitHub Actions 每 10 分钟请求一次：
+
+```text
+https://<xxx>.onrender.com/api/health
+```
+
+但免费版平台策略可能变化，这种 keep-alive 只能降低休眠概率，不能保证生产级 SLA；真实业务高频测试建议升级到 Render Starter 或其他不休眠实例。
 
 ### 导出文件 24h 后失效
 

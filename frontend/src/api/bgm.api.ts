@@ -1,13 +1,14 @@
 import { request } from './client';
+import type { BgmTrackDto, BgmCategory } from '@shared/book';
 
 export const bgmApi = {
-  async list(): Promise<Array<{ id: string; name: string; category: string; storageKey: string; durationMs: number }>> {
-    return request<Array<{ id: string; name: string; category: string; storageKey: string; durationMs: number }>>({
+  async list(): Promise<BgmTrackDto[]> {
+    return request<BgmTrackDto[]>({
       method: 'GET',
       url: '/bgm/tracks',
     });
   },
-  async categories(): Promise<string[]> {
-    return request<string[]>({ method: 'GET', url: '/bgm/categories' });
+  async categories(): Promise<BgmCategory[]> {
+    return request<BgmCategory[]>({ method: 'GET', url: '/bgm/categories' });
   },
 };

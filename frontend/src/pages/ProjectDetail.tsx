@@ -38,6 +38,8 @@ import SaveIcon from '@mui/icons-material/Save';
 import EditIcon from '@mui/icons-material/Edit';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import MusicNoteIcon from '@mui/icons-material/MusicNote';
+import LinkIcon from '@mui/icons-material/Link';
+import CancelIcon from '@mui/icons-material/Cancel';
 import { Waveform } from '../components/player/Waveform';
 import { SubtitleOverlay } from '../components/player/SubtitleOverlay';
 import { ScriptEditor } from '../components/script/ScriptEditor';
@@ -50,10 +52,11 @@ import { exportApi } from '../api/export.api';
 import { useProgress } from '../hooks/useProgress';
 import { useUiStore } from '../store/ui.store';
 import { useProjectStore } from '../store/project.store';
+import { useConfigStore } from '../store/config.store';
 import { ENV } from '../constants/env';
 import { downloadFromUrl } from '../utils/download';
 import { formatMs, formatTime, formatPercent } from '../utils/format';
-import type { ProjectDto } from '@shared/project';
+import type { ProjectDto, RevisionPreset, ScriptTemplate } from '@shared/project';
 import type { ScriptDto, ScriptSegmentDto } from '@shared/script';
 import type { BgmTrackDto } from '@shared/book';
 
@@ -83,6 +86,23 @@ const PIPELINE_STEPS = [
   { key: 'mix', label: '合成' },
 ] as const;
 
+const DOWNLOAD_OPTIONS: Array<{ format: 'mp3' | 'srt' | 'vtt' | 'txt' | 'pdf' | 'zip'; label: string }> = [
+  { format: 'mp3', label: '播客音频 MP3' },
+  { format: 'txt', label: 'AI 文稿 TXT' },
+  { format: 'pdf', label: 'AI 文稿 PDF' },
+  { format: 'srt', label: '字幕 SRT' },
+  { format: 'vtt', label: '字幕 VTT' },
+  { format: 'zip', label: '全部素材 ZIP' },
+];
+
+const REVISION_PRESETS: Array<{ id: RevisionPreset; label: string }> = [
+  { id: 'deeper', label: '更深入' },
+  { id: 'less-filler', label: '少口头禅' },
+  { id: 'lighter', label: '更轻松' },
+  { id: 'shorter', label: '缩短到 8 分钟' },
+  { id: 'more-cross-book', label: '加强跨书比较' },
+];
+
 export function ProjectDetail(): JSX.Element {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -90,6 +110,8 @@ export function ProjectDetail(): JSX.Element {
   const push = useUiStore((s) => s.push);
   const setCurrent = useProjectStore((s) => s.setCurrentProject);
   const current = useProjectStore((s) => s.currentProject);
+  const subtitleStyle = useConfigStore((s) => s.subtitleStyle);
+  const setSubtitleStyle = useConfigStore((s) => s.setSubtitleStyle);
 
   const [tab, setTab] = useState(0);
   const [project, setProject] = useState<ProjectDto | null>(current);
@@ -106,6 +128,10 @@ export function ProjectDetail(): JSX.Element {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [confirmRegen, setConfirmRegen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [customRevision, setCustomRevision] = useState('');
+  const [regeneratingPreset, setRegeneratingPreset] = useState<RevisionPreset | 'custom' | 'default' | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -223,11 +249,20 @@ export function ProjectDetail(): JSX.Element {
     }
   }, [project, id, draftScript, script, push, t]);
 
-  const onRegenerate = useCallback(async (): Promise<void> => {
+  const triggerRegenerate = useCallback(async (
+    revisionPreset?: RevisionPreset,
+    customInstruction?: string,
+  ): Promise<void> => {
     if (!id) return;
+    const marker = revisionPreset ?? (customInstruction ? 'custom' : 'default');
+    setRegeneratingPreset(marker);
     try {
-      await projectApi.regenerate(id);
-      push('已触发重新生成', 'info');
+      await projectApi.regenerate(id, {
+        scriptTemplate: (project?.scriptTemplate ?? 'audio-overview') as ScriptTemplate,
+        revisionPreset,
+        customInstruction: customInstruction?.trim() || undefined,
+      });
+      push(revisionPreset || customInstruction ? '已触发脚本返修' : '已触发重新生成', 'info');
       setConfirmRegen(false);
       const p = await projectApi.get(id).catch(() => null);
       if (p) {
@@ -236,13 +271,63 @@ export function ProjectDetail(): JSX.Element {
       }
     } catch (e) {
       push(`重新生成失败: ${(e as Error).message}`, 'error');
+    } finally {
+      setRegeneratingPreset(null);
+    }
+  }, [id, project?.scriptTemplate, push, setCurrent]);
+
+  const onRegenerate = useCallback(async (): Promise<void> => {
+    await triggerRegenerate();
+  }, [triggerRegenerate]);
+
+  const onCustomRegenerate = useCallback(async (): Promise<void> => {
+    const instruction = customRevision.trim();
+    if (!instruction) {
+      push('请先输入返修要求', 'info');
+      return;
+    }
+    await triggerRegenerate(undefined, instruction);
+    setCustomRevision('');
+  }, [customRevision, push, triggerRegenerate]);
+
+  const onCancelProject = useCallback(async (): Promise<void> => {
+    if (!id) return;
+    try {
+      const r = await projectApi.cancel(id);
+      setProject(r.project);
+      setCurrent(r.project);
+      push(`已取消生成，移除 ${r.cancelled} 个队列任务`, 'success');
+      setConfirmCancel(false);
+    } catch (e) {
+      push(`取消失败: ${(e as Error).message}`, 'error');
     }
   }, [id, push, setCurrent]);
 
   const onDelete = useCallback(async (): Promise<void> => {
     if (!project) return;
-    push(`「${project.title}」暂未接入删除接口`, 'info');
-    setConfirmDelete(false);
+    try {
+      await projectApi.remove(project.id);
+      push(`已删除「${project.title}」`, 'success');
+      setConfirmDelete(false);
+      navigate('/projects');
+    } catch (e) {
+      push(`删除失败: ${(e as Error).message}`, 'error');
+    }
+  }, [project, push, navigate]);
+
+  const onCreateShare = useCallback(async (): Promise<void> => {
+    if (!project) return;
+    try {
+      const share = await projectApi.createShare(project.id);
+      const url = share.url.startsWith('http')
+        ? share.url
+        : `${window.location.origin}${share.url}`;
+      setShareUrl(url);
+      await navigator.clipboard?.writeText(url).catch(() => undefined);
+      push('分享链接已生成并复制到剪贴板', 'success');
+    } catch (e) {
+      push(`分享失败: ${(e as Error).message}`, 'error');
+    }
   }, [project, push]);
 
   const download = (format: 'mp3' | 'srt' | 'vtt' | 'txt' | 'pdf' | 'zip'): void => {
@@ -330,6 +415,13 @@ export function ProjectDetail(): JSX.Element {
             <MoreVertIcon />
           </IconButton>
         </Tooltip>
+        {p.status === 'generating' && (
+          <Tooltip title="取消生成">
+            <IconButton onClick={() => setConfirmCancel(true)} aria-label="cancel generation" color="warning">
+              <CancelIcon />
+            </IconButton>
+          </Tooltip>
+        )}
       </Stack>
 
       {p.status === 'generating' && (
@@ -447,6 +539,137 @@ export function ProjectDetail(): JSX.Element {
               </Stack>
             )}
           </Stack>
+          {script?.episodeBrief && (
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Stack spacing={1.5}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                  <Typography variant="subtitle1" fontWeight={700}>节目策划</Typography>
+                  <Chip size="small" label="AI 深潜 brief" color="primary" variant="outlined" />
+                </Stack>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">核心问题</Typography>
+                  <Typography variant="body1" fontWeight={600}>{script.episodeBrief.episodeQuestion}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">开场承诺</Typography>
+                  <Typography variant="body2">{script.episodeBrief.openingPromise}</Typography>
+                </Box>
+                <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
+                  {script.episodeBrief.bookRoles.map((item) => (
+                    <Paper key={item.title} variant="outlined" sx={{ p: 1.5, bgcolor: 'background.default' }}>
+                      <Typography variant="caption" color="text.secondary">{item.title}</Typography>
+                      <Typography variant="body2">{item.role}</Typography>
+                    </Paper>
+                  ))}
+                </Box>
+                <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                  {script.episodeBrief.crossBookAngles.map((item) => (
+                    <Chip key={item} size="small" label={item} />
+                  ))}
+                </Stack>
+                <Stack spacing={0.5}>
+                  {script.episodeBrief.listenerTakeaways.map((item) => (
+                    <Typography key={item} variant="body2" color="text.secondary">- {item}</Typography>
+                  ))}
+                </Stack>
+                {script.episodeBrief.sourceLimits.length > 0 && (
+                  <Alert severity="info">
+                    {script.episodeBrief.sourceLimits.join('；')}
+                  </Alert>
+                )}
+              </Stack>
+            </Paper>
+          )}
+          {script?.qualityReport && (
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Stack spacing={1.5}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                  <Typography variant="subtitle1" fontWeight={700}>质量自检</Typography>
+                  <Chip
+                    size="small"
+                    color={script.qualityReport.status === 'pass' ? 'success' : 'warning'}
+                    label={script.qualityReport.status === 'pass' ? '通过' : '需关注'}
+                  />
+                </Stack>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Chip
+                    size="small"
+                    label={script.qualityReport.hasCrossBookComparison ? '已包含跨书比较' : '缺少跨书比较'}
+                    color={script.qualityReport.hasCrossBookComparison ? 'success' : 'warning'}
+                    variant="outlined"
+                  />
+                  <Chip size="small" label={`口头禅 ${script.qualityReport.fillerPhraseCount} 次`} variant="outlined" />
+                </Stack>
+                <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' } }}>
+                  {script.qualityReport.bookCoverage.map((item) => (
+                    <Paper key={item.title} variant="outlined" sx={{ p: 1.5, bgcolor: 'background.default' }}>
+                      <Stack direction="row" justifyContent="space-between" spacing={1}>
+                        <Typography variant="body2" fontWeight={600}>{item.title}</Typography>
+                        <Chip
+                          size="small"
+                          label={item.hasSubstantiveLine ? '已覆盖' : '偏弱'}
+                          color={item.hasSubstantiveLine ? 'success' : 'warning'}
+                        />
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary">
+                        提及 {item.mentionCount} 次 · {item.summaryAvailable ? '有真实简介' : '缺少真实简介'}
+                      </Typography>
+                    </Paper>
+                  ))}
+                </Box>
+                {script.qualityReport.warnings.length > 0 ? (
+                  <Alert severity="warning">
+                    <Stack spacing={0.5}>
+                      {script.qualityReport.warnings.map((item) => (
+                        <Typography key={item} variant="body2">{item}</Typography>
+                      ))}
+                    </Stack>
+                  </Alert>
+                ) : (
+                  <Alert severity="success">脚本覆盖、跨书比较和事实边界检查通过。</Alert>
+                )}
+              </Stack>
+            </Paper>
+          )}
+          {script && (
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Stack spacing={1.5}>
+                <Typography variant="subtitle1" fontWeight={700}>快速返修</Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  {REVISION_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.id}
+                      size="small"
+                      variant="outlined"
+                      loading={regeneratingPreset === preset.id}
+                      disabled={p.status === 'generating'}
+                      onClick={() => void triggerRegenerate(preset.id)}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </Stack>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    label="自定义返修要求"
+                    value={customRevision}
+                    onChange={(event) => setCustomRevision(event.target.value)}
+                    inputProps={{ maxLength: 500 }}
+                  />
+                  <Button
+                    variant="contained"
+                    loading={regeneratingPreset === 'custom'}
+                    disabled={p.status === 'generating'}
+                    onClick={() => void onCustomRegenerate()}
+                  >
+                    返修
+                  </Button>
+                </Stack>
+              </Stack>
+            </Paper>
+          )}
           {editingScript ? (
             <TextField
               multiline
@@ -601,15 +824,34 @@ export function ProjectDetail(): JSX.Element {
               ) : (
                 <Alert severity="info">{t('projectDetail.notGenerated')}</Alert>
               )}
-              {script?.segments && script.segments.length > 0 && audioUrl && (
-                <Box sx={{ mt: 2 }}>
-                  <SubtitleOverlay
-                    segments={script.segments}
-                    currentMs={currentMs}
-                    onSeek={(ms) => setSeekTo(ms)}
-                  />
-                </Box>
-              )}
+          {script?.segments && script.segments.length > 0 && audioUrl && (
+            <Box sx={{ mt: 2 }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
+                <TextField
+                  type="number"
+                  size="small"
+                  label="字幕字号"
+                  value={subtitleStyle.fontSize}
+                  onChange={(e) => setSubtitleStyle({ fontSize: Number(e.target.value) })}
+                  inputProps={{ min: 12, max: 28 }}
+                />
+                <TextField
+                  type="number"
+                  size="small"
+                  label="字幕行距"
+                  value={subtitleStyle.lineHeight}
+                  onChange={(e) => setSubtitleStyle({ lineHeight: Number(e.target.value) })}
+                  inputProps={{ min: 1.2, max: 2.4, step: 0.1 }}
+                />
+              </Stack>
+              <SubtitleOverlay
+                segments={script.segments}
+                currentMs={currentMs}
+                onSeek={(ms) => setSeekTo(ms)}
+                style={{ fontSize: subtitleStyle.fontSize, lineHeight: subtitleStyle.lineHeight }}
+              />
+            </Box>
+          )}
             </CardContent>
           </Card>
 
@@ -617,18 +859,31 @@ export function ProjectDetail(): JSX.Element {
             <CardContent>
               <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>⬇ 下载</Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {(['mp3', 'srt', 'vtt', 'txt', 'pdf', 'zip'] as const).map((fmt) => (
+                <Button
+                  variant="contained"
+                  startIcon={<LinkIcon />}
+                  onClick={() => void onCreateShare()}
+                  disabled={p.status !== 'done' && p.status !== 'partial'}
+                >
+                  生成分享链接
+                </Button>
+                {DOWNLOAD_OPTIONS.map((item) => (
                   <Button
-                    key={fmt}
+                    key={item.format}
                     variant="outlined"
                     startIcon={<DownloadIcon />}
-                    onClick={() => download(fmt)}
+                    onClick={() => download(item.format)}
                     disabled={p.status !== 'done' && p.status !== 'partial'}
                   >
-                    {fmt.toUpperCase()}
+                    {item.label}
                   </Button>
                 ))}
               </Box>
+              {shareUrl && (
+                <Alert severity="success" sx={{ mt: 2 }}>
+                  分享链接：{shareUrl}
+                </Alert>
+              )}
               {p.status !== 'done' && p.status !== 'partial' && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                   项目生成完成后即可下载
@@ -651,6 +906,19 @@ export function ProjectDetail(): JSX.Element {
           </ListItemIcon>
           {t('projectDetail.regenerate')}
         </MenuItem>
+        {p.status === 'generating' && (
+          <MenuItem
+            onClick={() => {
+              setMenuAnchor(null);
+              setConfirmCancel(true);
+            }}
+          >
+            <ListItemIcon>
+              <CancelIcon fontSize="small" />
+            </ListItemIcon>
+            取消生成
+          </MenuItem>
+        )}
         <Divider />
         <MenuItem
           onClick={() => {
@@ -672,6 +940,15 @@ export function ProjectDetail(): JSX.Element {
         confirmText={t('projectDetail.regenerate')}
         onConfirm={onRegenerate}
         onClose={() => setConfirmRegen(false)}
+      />
+      <ConfirmDialog
+        open={confirmCancel}
+        title="取消生成"
+        message="确认取消当前生成任务？已生成资源会作为草稿保留。"
+        confirmText="取消生成"
+        confirmColor="warning"
+        onConfirm={onCancelProject}
+        onClose={() => setConfirmCancel(false)}
       />
       <ConfirmDialog
         open={confirmDelete}

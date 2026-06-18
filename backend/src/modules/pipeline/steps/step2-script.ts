@@ -93,11 +93,15 @@ export async function runStep2(
   const ctx = {
     projectId: input.runId,
     books: [input.book] as V10BookMetadata[],
-    mode: 'independent' as const,
-    template: input.template === 'merge' ? ('merge' as const) : ('standard' as const),
-    title: input.book.title,
-  };
-  const rawSegments: ScriptSegmentDto[] = await adapter.generateScript(ctx);
+  mode: 'independent' as const,
+  template: input.template === 'merge' ? ('merge' as const) : ('standard' as const),
+  scriptTemplate: 'default' as const,
+  title: input.book.title,
+};
+  const generated = await adapter.generateScript(ctx) as unknown;
+  const rawSegments: ScriptSegmentDto[] = Array.isArray(generated)
+    ? generated as ScriptSegmentDto[]
+    : (generated as { segments: ScriptSegmentDto[] }).segments;
 
   // Normalise to v1.1 shapes: stage labels, emotion whitelist,
   // monotonically-increasing `orderIndex`.

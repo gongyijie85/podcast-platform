@@ -1,75 +1,174 @@
-import { Card, CardContent, CardActions, Typography, Button, Stack, Avatar, Box, Chip, IconButton, Tooltip } from '@mui/material';
+import { Card, CardContent, CardActions, Typography, Button, Stack, Avatar, Box, Chip, IconButton, Tooltip, Checkbox } from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import type { BookMetadata } from '@shared/book';
+
+const SOURCE_LABELS: Record<BookMetadata['source'], string> = {
+  openlibrary: '来源：Open Library',
+  googlebooks: '来源：Google Books',
+  bookrank: '来源：BookRank',
+  mock: '来源：Mock 数据',
+};
 
 interface Props {
   book: BookMetadata;
   selected?: boolean;
   onUse?: (b: BookMetadata) => void;
   onRemove?: (b: BookMetadata) => void;
+  layout?: 'grid' | 'list';
+  index?: number;
+  selectable?: boolean;
+  checked?: boolean;
+  onToggleSelect?: (b: BookMetadata) => void;
 }
 
 /**
  * Compact book card. Shows cover, title, author, and an "Use this book" button.
  * Used in BookSearch results and Dashboard "recently used" lists.
  */
-export function BookCard({ book, selected = false, onUse, onRemove }: Props): JSX.Element {
+export function BookCard({
+  book,
+  selected = false,
+  onUse,
+  onRemove,
+  layout = 'grid',
+  index,
+  selectable = false,
+  checked = false,
+  onToggleSelect,
+}: Props): JSX.Element {
+  const isList = layout === 'list';
+  const highlighted = selected || checked;
+  const rank = 'rank' in book && typeof book.rank === 'number' ? book.rank : null;
+  const categoryName = 'categoryName' in book && typeof book.categoryName === 'string' ? book.categoryName : null;
+
   return (
     <Card
       variant="outlined"
       sx={{
         height: '100%',
         display: 'flex',
-        flexDirection: 'column',
-        borderColor: selected ? 'primary.main' : 'divider',
-        borderWidth: selected ? 2 : 1,
-        transition: 'all 0.15s',
-        '&:hover': { boxShadow: 2 },
+        flexDirection: isList ? { xs: 'column', sm: 'row' } : 'column',
+        borderColor: highlighted ? 'primary.main' : 'divider',
+        borderWidth: highlighted ? 2 : 1,
+        borderRadius: 1,
+        overflow: 'hidden',
+        transition: 'border-color 0.15s, box-shadow 0.15s, transform 0.15s',
+        '&:hover': { boxShadow: 2, borderColor: highlighted ? 'primary.main' : 'primary.light' },
       }}
     >
-      <CardContent sx={{ flex: 1, pb: 1, '&:last-child': { pb: 2 } }}>
+      <CardContent
+        sx={{
+          flex: 1,
+          pb: isList ? 2 : 1,
+          '&:last-child': { pb: isList ? 2 : 2 },
+        }}
+      >
         <Stack direction="row" spacing={2} alignItems="flex-start">
-          <Avatar
-            variant="rounded"
-            src={book.coverUrl ?? undefined}
-            sx={{ width: 64, height: 88, bgcolor: 'primary.light', flexShrink: 0 }}
-          >
-            <MenuBookIcon />
-          </Avatar>
+          {selectable && (
+            <Checkbox
+              checked={checked}
+              onChange={() => onToggleSelect?.(book)}
+              inputProps={{ 'aria-label': `选择 ${book.title}` }}
+              sx={{ mt: -1, ml: -1, flexShrink: 0 }}
+            />
+          )}
+          <Box sx={{ position: 'relative', flexShrink: 0 }}>
+            <Avatar
+              variant="rounded"
+              src={book.coverUrl ?? undefined}
+              sx={{
+                width: isList ? 76 : 64,
+                height: isList ? 108 : 88,
+                bgcolor: 'primary.light',
+                borderRadius: 1,
+              }}
+            >
+              <MenuBookIcon />
+            </Avatar>
+            {typeof index === 'number' && (
+              <Box
+                aria-label={`result ${index}`}
+                sx={{
+                  position: 'absolute',
+                  top: -8,
+                  left: -8,
+                  minWidth: 26,
+                  height: 26,
+                  px: 0.75,
+                  borderRadius: 1,
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  boxShadow: 1,
+                }}
+              >
+                {index}
+              </Box>
+            )}
+          </Box>
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="subtitle1" fontWeight={600} sx={{ lineHeight: 1.3 }} title={book.title}>
+            <Typography
+              variant={isList ? 'h6' : 'subtitle1'}
+              fontWeight={700}
+              sx={{ lineHeight: 1.25, fontSize: isList ? { xs: 16, md: 18 } : undefined }}
+              title={book.title}
+            >
               {book.title}
             </Typography>
-            <Typography variant="body2" color="text.secondary" title={book.author}>
+            <Typography variant="body2" color="text.secondary" title={book.author} sx={{ mt: 0.25 }}>
               {book.author}
             </Typography>
             <Stack direction="row" spacing={0.5} sx={{ mt: 1, flexWrap: 'wrap', gap: 0.5 }}>
               <Chip size="small" label={book.isbn} variant="outlined" />
+              {rank && <Chip size="small" label={`榜单 #${rank}`} color="primary" variant="outlined" />}
+              {categoryName && <Chip size="small" label={categoryName} variant="outlined" />}
               {book.publisher && <Chip size="small" label={book.publisher} variant="outlined" />}
               {book.publishedDate && <Chip size="small" label={book.publishedDate} variant="outlined" />}
+              <Chip size="small" label={SOURCE_LABELS[book.source].replace('来源：', '')} variant="outlined" />
             </Stack>
-            {book.summary && (
+            {book.summary ? (
               <Typography
-                variant="caption"
+                variant="body2"
                 color="text.secondary"
                 sx={{
                   display: '-webkit-box',
-                  WebkitLineClamp: 2,
+                  WebkitLineClamp: isList ? 4 : 3,
                   WebkitBoxOrient: 'vertical',
                   overflow: 'hidden',
                   mt: 1,
+                  lineHeight: 1.7,
                 }}
               >
                 {book.summary}
+              </Typography>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontStyle: 'italic' }}>
+                暂无简介信息
               </Typography>
             )}
           </Box>
         </Stack>
       </CardContent>
-      <CardActions sx={{ p: 1.5, pt: 0, justifyContent: 'space-between' }}>
-        <Stack direction="row" spacing={0.5} alignItems="center">
+      <CardActions
+        sx={{
+          p: 1.5,
+          pt: isList ? { xs: 0, sm: 1.5 } : 0,
+          minWidth: isList ? { sm: 168 } : undefined,
+          justifyContent: isList ? { xs: 'space-between', sm: 'center' } : 'space-between',
+          alignItems: isList ? { xs: 'center', sm: 'flex-end' } : 'center',
+          flexDirection: isList ? { xs: 'row', sm: 'column' } : 'row',
+          borderLeft: isList ? { sm: '1px solid' } : undefined,
+          borderColor: 'divider',
+          bgcolor: isList ? { sm: 'background.default' } : undefined,
+        }}
+      >
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
           {selected && (
             <Chip
               size="small"
@@ -79,11 +178,11 @@ export function BookCard({ book, selected = false, onUse, onRemove }: Props): JS
               variant="filled"
             />
           )}
-          <Typography variant="caption" color="text.secondary">
-            {book.source}
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {SOURCE_LABELS[book.source]}
           </Typography>
         </Stack>
-        <Stack direction="row" spacing={0.5}>
+        <Stack direction={isList ? { xs: 'row', sm: 'column' } : 'row'} spacing={0.75}>
           {onRemove && (
             <Tooltip title="移除">
               <IconButton size="small" onClick={() => onRemove(book)} aria-label="remove book">
@@ -92,7 +191,12 @@ export function BookCard({ book, selected = false, onUse, onRemove }: Props): JS
             </Tooltip>
           )}
           {onUse && (
-            <Button size="small" variant={selected ? 'outlined' : 'contained'} onClick={() => onUse(book)}>
+            <Button
+              size="small"
+              variant={selected ? 'outlined' : 'contained'}
+              onClick={() => onUse(book)}
+              sx={{ whiteSpace: 'nowrap' }}
+            >
               {selected ? '已选' : '使用此书'}
             </Button>
           )}

@@ -5,6 +5,7 @@ import { QUEUE_NAMES, STAGE_WEIGHTS } from '../constants';
 import { ScriptService } from '../../script/script.service';
 import { ProgressGateway } from '../../ws/progress.gateway';
 import { randomUUID } from 'node:crypto';
+import type { RegenerateProjectPayload } from '@shared/project';
 
 @Processor(QUEUE_NAMES.SCRIPT, { concurrency: 1 })
 export class ScriptProcessor extends WorkerHost {
@@ -17,8 +18,8 @@ export class ScriptProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<{ projectId: string }>): Promise<{ segments: number }> {
-    const { projectId } = job.data;
+  async process(job: Job<{ projectId: string; scriptOptions?: RegenerateProjectPayload }>): Promise<{ segments: number }> {
+    const { projectId, scriptOptions } = job.data;
     const traceId = randomUUID();
     this.logger.log(`[${traceId}] script job for project ${projectId}`);
 
@@ -33,7 +34,7 @@ export class ScriptProcessor extends WorkerHost {
     });
     await job.updateProgress(10);
 
-    const result = await this.scriptService.generateForProject(projectId);
+    const result = await this.scriptService.generateForProject(projectId, scriptOptions ?? {});
 
     await this.progress.emit({
       type: 'project.progress',

@@ -1,7 +1,19 @@
 import { create } from 'zustand';
 import { authApi } from '../api/auth.api';
+import { projectApi } from '../api/project.api';
 import { localStorageAdapter } from '../storage/local-storage.adapter';
 import type { UserDto } from '@shared/user';
+
+const GUEST_PROJECT_IDS_KEY = 'guest.projectIds';
+
+async function syncGuestProjects(): Promise<void> {
+  const ids = localStorageAdapter.get<string[]>(GUEST_PROJECT_IDS_KEY) ?? [];
+  if (ids.length === 0) return;
+  const result = await projectApi.sync(ids);
+  if (result.synced > 0) {
+    localStorageAdapter.remove(GUEST_PROJECT_IDS_KEY);
+  }
+}
 
 interface AuthState {
   token: string | null;
@@ -49,6 +61,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         token: r.tokens.accessToken,
         isAuthenticated: true,
       });
+      await syncGuestProjects().catch(() => undefined);
     } catch (e) {
       const msg = e instanceof Error ? e.message : '登录失败';
       set({ error: msg });
@@ -69,6 +82,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         token: r.tokens.accessToken,
         isAuthenticated: true,
       });
+      await syncGuestProjects().catch(() => undefined);
     } catch (e) {
       const msg = e instanceof Error ? e.message : '注册失败';
       set({ error: msg });

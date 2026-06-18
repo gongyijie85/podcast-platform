@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { LlmAdapter, ScriptGenerationContext } from './llm.adapter';
+import type { GeneratedScriptResult, LlmAdapter, ScriptGenerationContext } from './llm.adapter';
 import type { ScriptSegmentDto, ScriptEmotion, ScriptStage, Speaker } from '@shared/script';
 
 /**
@@ -71,7 +71,7 @@ const STAGE_V11_TO_V10: Record<string, ScriptStage> = {
 /**
  * MockScriptGenAdapter — deterministic, fixture-driven script generator.
  *
- * Used by the v1.1 flow layer when no `DOUBAO_API_KEY` is configured. Produces
+ * Used by the v1.1 flow layer when no LLM API key is configured. Produces
  * the same output for the same input (no randomness in segment content), with
  * only the simulated-network latency being random (50..200ms).
  *
@@ -107,7 +107,7 @@ export class MockScriptGenAdapter implements LlmAdapter {
     }
   }
 
-  async generateScript(ctx: ScriptGenerationContext): Promise<ScriptSegmentDto[]> {
+  async generateScript(ctx: ScriptGenerationContext): Promise<GeneratedScriptResult> {
     // Validate book input. v1.1 takes the first book as the "primary" subject.
     const primary = ctx.books?.[0];
     if (!primary || !primary.title || !primary.summary) {
@@ -142,6 +142,6 @@ export class MockScriptGenAdapter implements LlmAdapter {
     this.logger.log(
       `MockScriptGenAdapter produced ${segments.length} segments for project=${ctx.projectId} book="${primary.title}"`,
     );
-    return segments;
+    return { segments, episodeBrief: null };
   }
 }

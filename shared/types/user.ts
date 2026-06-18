@@ -30,3 +30,13 @@ export interface RegisterPayload {
 export interface AuthResponse extends UserDto {
   tokens: AuthTokens;
 }
+
+export interface UserPreferencesDto {
+  recentVoiceIds?: string[];
+  recentBgmTrackIds?: string[];
+  subtitleStyle?: {
+    fontSize: number;
+    lineHeight: number;
+  };
+  language?: 'zh-CN' | 'en-US';
+}

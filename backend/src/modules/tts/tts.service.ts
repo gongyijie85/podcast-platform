@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { VolcengineAdapter } from './adapters/volcengine.adapter';
 import { AzureAdapter } from './adapters/azure.adapter';
+import { XiaomiMimoAdapter } from './adapters/xiaomi-mimo.adapter';
 import { StorageService } from '../storage/storage.service';
 import { QueueService } from '../queue/queue.service';
 import { ProgressGateway } from '../ws/progress.gateway';
@@ -19,6 +20,7 @@ export class TtsService {
     private readonly prisma: PrismaService,
     private readonly volc: VolcengineAdapter,
     private readonly azure: AzureAdapter,
+    private readonly xiaomi: XiaomiMimoAdapter,
     private readonly storage: StorageService,
     @Inject(forwardRef(() => QueueService))
     private readonly queues: QueueService,
@@ -26,8 +28,8 @@ export class TtsService {
   ) {}
 
   async listVoices(): Promise<TtsVoice[]> {
-    const [v, a] = await Promise.all([this.volc.listVoices(), this.azure.listVoices()]);
-    return [...v, ...a];
+    const [x, v, a] = await Promise.all([this.xiaomi.listVoices(), this.volc.listVoices(), this.azure.listVoices()]);
+    return [...x, ...v, ...a];
   }
 
   async preview(voiceId: string, text: string, _emotion?: string): Promise<TtsPreviewResult> {
@@ -58,7 +60,7 @@ export class TtsService {
       const seg = script.segments[i];
       const voice = voiceByRole.get(seg.speaker);
       const voiceId = voice?.voiceId ?? 'BV001_streaming';
-      const adapter = this.pickAdapter(voiceId);
+      const adapter = this.pickAdapter(voiceId, voice?.provider);
 
       const { buffer, durationMs } = await adapter.synthesize(seg.text, voiceId);
       const key = `tts/${projectId}/${seg.id}.mp3`;
@@ -111,8 +113,16 @@ export class TtsService {
     return { count: synthesized, totalMs: cursorMs };
   }
 
-  private pickAdapter(voiceId: string): VolcengineAdapter | AzureAdapter {
+  private pickAdapter(
+    voiceId: string,
+    provider?: string | null,
+  ): VolcengineAdapter | AzureAdapter | XiaomiMimoAdapter {
+    if (provider === 'xiaomi') return this.xiaomi;
+    if (provider === 'volcengine') return this.volc;
+    if (provider === 'azure') return this.azure;
     if (voiceId.startsWith('BV')) return this.volc;
+    if (voiceId.startsWith('zh-')) return this.azure;
+    if (this.xiaomi.hasVoice(voiceId)) return this.xiaomi;
     return this.azure;
   }
 }

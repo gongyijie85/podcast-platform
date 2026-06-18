@@ -1,13 +1,13 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ScriptService } from './script.service';
 import { ScriptController } from './script.controller';
-import { DoubaoAdapter } from './adapters/doubao.adapter';
+import { OpenAICompatibleLlmAdapter } from './adapters/openai-compatible-llm.adapter';
 import { QueueModule } from '../queue/queue.module';
 
 @Module({
   imports: [forwardRef(() => QueueModule)],
-  providers: [ScriptService, DoubaoAdapter],
+  providers: [ScriptService, OpenAICompatibleLlmAdapter],
   controllers: [ScriptController],
-  exports: [ScriptService, DoubaoAdapter],
+  exports: [ScriptService, OpenAICompatibleLlmAdapter],
 })
 export class ScriptModule {}

@@ -1,6 +1,43 @@
 import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
+export class BookMetadataInput {
+  @IsString()
+  isbn!: string;
+
+  @IsString()
+  @MaxLength(240)
+  title!: string;
+
+  @IsString()
+  @MaxLength(240)
+  author!: string;
+
+  @IsOptional()
+  @IsString()
+  coverUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  summary?: string | null;
+
+  @IsOptional()
+  @IsString()
+  podcastAngle?: string | null;
+
+  @IsOptional()
+  @IsString()
+  publisher?: string | null;
+
+  @IsOptional()
+  @IsString()
+  publishedDate?: string | null;
+
+  @IsOptional()
+  @IsIn(['openlibrary', 'googlebooks', 'mock', 'bookrank'])
+  source?: 'openlibrary' | 'googlebooks' | 'mock' | 'bookrank';
+}
+
 export class VoiceConfigInput {
   @IsIn(['host', 'guest'])
   role!: 'host' | 'guest';
@@ -8,8 +45,8 @@ export class VoiceConfigInput {
   @IsString()
   voiceId!: string;
 
-  @IsIn(['volcengine', 'azure', 'mock'])
-  provider!: 'volcengine' | 'azure' | 'mock';
+  @IsIn(['xiaomi', 'volcengine', 'azure', 'mock'])
+  provider!: 'xiaomi' | 'volcengine' | 'azure' | 'mock';
 }
 
 export class BgmConfigInput {
@@ -46,6 +83,16 @@ export class CreateProjectDto {
   @IsArray()
   @IsString({ each: true })
   isbns!: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BookMetadataInput)
+  books?: BookMetadataInput[];
+
+  @IsOptional()
+  @IsIn(['default', 'deep-review', 'casual-talk', 'academic', 'audio-overview'])
+  scriptTemplate?: 'default' | 'deep-review' | 'casual-talk' | 'academic' | 'audio-overview';
 
   @IsArray()
   @ValidateNested({ each: true })

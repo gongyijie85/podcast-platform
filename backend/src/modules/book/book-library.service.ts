@@ -1,0 +1,233 @@
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import { BookRankAdapter, type BookRankMappedBook } from './adapters/bookrank.adapter';
+import { normalizeIsbn } from '../../common/utils/isbn';
+import type {
+  BookLibraryItem,
+  BookLibraryListResult,
+  BookMetadata,
+  BookRankImportPayload,
+  BookRankImportResult,
+} from '@shared/book';
+
+interface LibraryListOptions {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  source?: string;
+  category?: string;
+}
+
+@Injectable()
+export class BookLibraryService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bookRank: BookRankAdapter,
+  ) {}
+
+  async list(options: LibraryListOptions): Promise<BookLibraryListResult> {
+    const page = this.clampInt(options.page, 1, 9999, 1);
+    const pageSize = this.clampInt(options.pageSize, 1, 50, 10);
+    const where = this.buildWhere(options);
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.bookLibraryItem.findMany({
+        where,
+        orderBy: [{ lastSeenAt: 'desc' }, { firstSeenAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.bookLibraryItem.count({ where }),
+    ]);
+
+    return {
+      items: items.map((item) => this.toDto(item)),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  async findByIsbns(isbns: string[]): Promise<BookLibraryItem[]> {
+    const normalized = Array.from(new Set(isbns.map((isbn) => normalizeIsbn(isbn)).filter(Boolean) as string[]));
+    if (normalized.length === 0) return [];
+    const items = await this.prisma.bookLibraryItem.findMany({
+      where: { isbn: { in: normalized } },
+    });
+    const byIsbn = new Map(items.map((item) => [item.isbn, item]));
+    return normalized.flatMap((isbn) => {
+      const item = byIsbn.get(isbn);
+      return item ? [this.toDto(item)] : [];
+    });
+  }
+
+  async upsertMany(
+    books: Array<BookMetadata | BookRankMappedBook>,
+    defaults: Partial<Pick<BookLibraryItem, 'category' | 'categoryName' | 'rank'>> = {},
+  ): Promise<BookLibraryItem[]> {
+    const saved: BookLibraryItem[] = [];
+    for (const book of books) {
+      const item = await this.upsertOne(book, defaults);
+      if (item) saved.push(item);
+    }
+    return saved;
+  }
+
+  async importFromBookRank(payload: BookRankImportPayload): Promise<BookRankImportResult> {
+    const limit = this.clampInt(payload.limit, 1, 50, 20);
+    const items =
+      payload.kind === 'new-books'
+        ? await this.bookRank.fetchNewBooks(limit)
+        : await this.bookRank.fetchBestsellers(payload.category || 'hardcover-fiction', limit);
+    const saved = await this.upsertMany(items);
+    return { imported: saved.length, items: saved };
+  }
+
+  private async upsertOne(
+    book: BookMetadata | BookRankMappedBook,
+    defaults: Partial<Pick<BookLibraryItem, 'category' | 'categoryName' | 'rank'>>,
+  ): Promise<BookLibraryItem | null> {
+    const isbn = normalizeIsbn(book.isbn);
+    if (!isbn) return null;
+    const existing = await this.prisma.bookLibraryItem.findUnique({ where: { isbn } });
+    const category = 'category' in book ? book.category ?? defaults.category ?? null : defaults.category ?? null;
+    const categoryName = 'categoryName' in book ? book.categoryName ?? defaults.categoryName ?? null : defaults.categoryName ?? null;
+    const rank = 'rank' in book ? book.rank ?? defaults.rank ?? null : defaults.rank ?? null;
+
+    if (!existing) {
+      const created = await this.prisma.bookLibraryItem.create({
+        data: {
+          isbn,
+          title: book.title.trim(),
+          author: book.author.trim(),
+          coverUrl: book.coverUrl ?? null,
+          summary: this.cleanNullable(book.summary),
+          publisher: this.cleanNullable(book.publisher),
+          publishedDate: this.cleanNullable(book.publishedDate),
+          pageCount: book.pageCount ?? null,
+          source: book.source,
+          category,
+          categoryName,
+          rank,
+        },
+      });
+      return this.toDto(created);
+    }
+
+    const preserveBookRank = existing.source === 'bookrank' && book.source !== 'bookrank';
+    const updated = await this.prisma.bookLibraryItem.update({
+      where: { isbn },
+      data: {
+        ...(preserveBookRank ? {} : this.presentString('title', book.title, existing.title)),
+        ...(preserveBookRank ? {} : this.presentString('author', book.author, existing.author)),
+        ...this.presentNullableString('coverUrl', book.coverUrl, existing.coverUrl, preserveBookRank),
+        ...this.presentNullableString('summary', book.summary, existing.summary, preserveBookRank),
+        ...this.presentNullableString('publisher', book.publisher, existing.publisher, preserveBookRank),
+        ...this.presentNullableString('publishedDate', book.publishedDate, existing.publishedDate, preserveBookRank),
+        ...(book.pageCount && !(preserveBookRank && existing.pageCount) ? { pageCount: book.pageCount } : {}),
+        source: this.preferSource(existing.source, book.source),
+        ...(category ? { category } : {}),
+        ...(categoryName ? { categoryName } : {}),
+        ...(rank ? { rank } : {}),
+        queryCount: { increment: 1 },
+      },
+    });
+    return this.toDto(updated);
+  }
+
+  private buildWhere(options: LibraryListOptions): Prisma.BookLibraryItemWhereInput {
+    const and: Prisma.BookLibraryItemWhereInput[] = [];
+    const q = options.q?.trim();
+    if (q) {
+      and.push({
+        OR: [
+          { title: { contains: q, mode: 'insensitive' } },
+          { author: { contains: q, mode: 'insensitive' } },
+          { isbn: { contains: q } },
+          { summary: { contains: q, mode: 'insensitive' } },
+          { publisher: { contains: q, mode: 'insensitive' } },
+        ],
+      });
+    }
+    if (options.source?.trim()) and.push({ source: options.source.trim() });
+    if (options.category?.trim()) and.push({ category: options.category.trim() });
+    return and.length > 0 ? { AND: and } : {};
+  }
+
+  private toDto(item: {
+    id: string;
+    isbn: string;
+    title: string;
+    author: string;
+    coverUrl: string | null;
+    summary: string | null;
+    publisher: string | null;
+    publishedDate: string | null;
+    pageCount: number | null;
+    source: string;
+    category: string | null;
+    categoryName: string | null;
+    rank: number | null;
+    queryCount: number;
+    firstSeenAt: Date;
+    lastSeenAt: Date;
+  }): BookLibraryItem {
+    return {
+      id: item.id,
+      isbn: item.isbn,
+      title: item.title,
+      author: item.author,
+      coverUrl: item.coverUrl,
+      summary: item.summary,
+      publisher: item.publisher,
+      publishedDate: item.publishedDate,
+      pageCount: item.pageCount,
+      source: this.toBookSource(item.source),
+      category: item.category,
+      categoryName: item.categoryName,
+      rank: item.rank,
+      queryCount: item.queryCount,
+      firstSeenAt: item.firstSeenAt.toISOString(),
+      lastSeenAt: item.lastSeenAt.toISOString(),
+    };
+  }
+
+  private toBookSource(value: string): BookMetadata['source'] {
+    return value === 'openlibrary' || value === 'googlebooks' || value === 'mock' || value === 'bookrank'
+      ? value
+      : 'mock';
+  }
+
+  private preferSource(existing: string, incoming: BookMetadata['source']): string {
+    if (incoming === 'bookrank') return incoming;
+    if (existing === 'mock' && incoming !== 'mock') return incoming;
+    return existing;
+  }
+
+  private presentString(field: 'title' | 'author', value: string, existing: string): Record<string, string> {
+    const clean = value.replace(/\s+/g, ' ').trim();
+    return clean && clean !== existing ? { [field]: clean } : {};
+  }
+
+  private presentNullableString(
+    field: 'coverUrl' | 'summary' | 'publisher' | 'publishedDate',
+    value: string | null | undefined,
+    existing: string | null,
+    preserveExisting = false,
+  ): Record<string, string> {
+    const clean = this.cleanNullable(value);
+    if (preserveExisting && existing) return {};
+    return clean && clean !== existing ? { [field]: clean } : {};
+  }
+
+  private cleanNullable(value: string | null | undefined): string | null {
+    const text = value?.replace(/\s+/g, ' ').trim();
+    return text || null;
+  }
+
+  private clampInt(value: unknown, min: number, max: number, fallback: number): number {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.max(min, Math.min(max, parsed));
+  }
+}

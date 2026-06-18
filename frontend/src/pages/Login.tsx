@@ -19,6 +19,7 @@ import { useAuthStore } from '../store/auth.store';
 import { useUiStore } from '../store/ui.store';
 import { Input } from '../components/common/Input';
 import { Button } from '../components/common/Button';
+import { isValidEmail, isValidPasswordLength } from '../utils/validation';
 
 export function Login(): JSX.Element {
   const { t } = useTranslation();
@@ -37,12 +38,21 @@ export function Login(): JSX.Element {
   const onSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     setErr(null);
-    if (!email || !password) {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail || !password) {
       setErr('请填写邮箱和密码');
       return;
     }
+    if (!isValidEmail(normalizedEmail)) {
+      setErr('请输入有效邮箱地址');
+      return;
+    }
+    if (!isValidPasswordLength(password)) {
+      setErr('密码至少 6 位');
+      return;
+    }
     try {
-      await login(email, password);
+      await login(normalizedEmail, password);
       push(t('auth.success'), 'success');
       navigate(from, { replace: true });
     } catch (e) {
@@ -114,7 +124,7 @@ export function Login(): JSX.Element {
           }}
         />
 
-        <Button type="submit" variant="contained" size="large" loading={loading} disabled={!email || !password}>
+        <Button type="submit" variant="contained" size="large" loading={loading} disabled={!email.trim() || !password}>
           {t('auth.submitLogin')}
         </Button>
 

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { TtsAdapter } from './tts.adapter';
 import type { TtsPreviewResult, TtsVoice } from '@shared/book';
+import { synthesizeMockSilence } from './mock-audio.util';
 
 /**
  * Azure TTS adapter (fallback). Same mock behavior as Volcengine.
@@ -28,29 +29,7 @@ export class AzureAdapter implements TtsAdapter {
     if (!hasKey) {
       this.logger.warn(`AZURE_TTS_KEY missing → mock mode (Mock 模式 - 实际部署需配置 Azure Key). voice=${voiceId}`);
     }
-    const chars = Array.from(text || ' ').length;
-    const durationMs = Math.max(1000, Math.round((chars / 4.5) * 1000));
-    const { default: ffmpeg } = await import('fluent-ffmpeg');
-    const buffer = await new Promise<Buffer>((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      const stream = require('node:stream');
-      const passthrough = new stream.PassThrough();
-      passthrough.on('data', (c: Buffer) => chunks.push(c));
-      passthrough.on('end', () => resolve(Buffer.concat(chunks)));
-      passthrough.on('error', (e: Error) => reject(e));
-      ffmpeg()
-        .input('anullsrc=channel_layout=mono:sample_rate=22050')
-        .inputFormat('lavfi')
-        .audioCodec('libmp3lame')
-        .audioBitrate('64k')
-        .audioChannels(1)
-        .audioFrequency(22050)
-        .duration(durationMs / 1000)
-        .format('mp3')
-        .on('error', (err: Error) => reject(err))
-        .stream(passthrough);
-    });
-    return { buffer, durationMs };
+    return synthesizeMockSilence(text);
   }
 
   async preview(text: string, voiceId: string): Promise<TtsPreviewResult> {

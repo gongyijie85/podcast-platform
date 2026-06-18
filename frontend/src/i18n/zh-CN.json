@@ -6,7 +6,7 @@
   "nav": {
     "home": "首页",
     "dashboard": "仪表盘",
-    "book": "① 选书",
+    "book": "图书整理",
     "config": "② 配置",
     "generating": "③ 生成",
     "preview": "④ 预览&导出",

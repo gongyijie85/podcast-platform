@@ -53,6 +53,9 @@ describe('normalizeIsbn', () => {
   it('normalizes a 13-digit ISBN with hyphens', () => {
     expect(normalizeIsbn('978-7-121-36220-0')).toBe('9787121362200');
   });
+  it('normalizes compact publisher hyphen ISBNs', () => {
+    expect(normalizeIsbn('978-0241662151')).toBe('9780241662151');
+  });
   it('normalizes a 13-digit ISBN with spaces', () => {
     expect(normalizeIsbn(' 9787121362200 ')).toBe('9787121362200');
   });
@@ -79,6 +82,10 @@ describe('parseIsbnInput', () => {
     expect(r).toHaveLength(1);
     expect(r[0].valid).toBe(true);
     expect(r[0].isbn).toBe('9787121362200');
+  });
+  it('parses a hyphenated ISBN-13 as one token', () => {
+    const r = parseIsbnInput('978-0241662151');
+    expect(r).toEqual([{ isbn: '9780241662151', valid: true }]);
   });
   it('parses comma-separated ISBNs', () => {
     const r = parseIsbnInput('9787121362200, 9787544253994');

@@ -156,7 +156,12 @@ export function BookSearchBar({
             ),
           }}
         />
-        <Button variant="outlined" onClick={handleAddSingle} disabled={!single.trim()}>
+        <Button
+          variant="outlined"
+          onClick={handleAddSingle}
+          disabled={!single.trim()}
+          sx={{ minWidth: 84, whiteSpace: 'nowrap', flexShrink: 0 }}
+        >
           {t('common.add', { defaultValue: '添加' })}
         </Button>
         <Button
@@ -164,6 +169,7 @@ export function BookSearchBar({
           onClick={handleSearch}
           disabled={valid.length === 0}
           startIcon={<SearchIcon />}
+          sx={{ minWidth: 96, whiteSpace: 'nowrap', flexShrink: 0 }}
         >
           {t('book.import')}
         </Button>

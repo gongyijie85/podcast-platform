@@ -2,64 +2,72 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
+  Alert,
   Box,
-  Stack,
-  Paper,
-  Typography,
-  TextField,
   Card,
   CardContent,
-  IconButton,
-  Tooltip,
-  FormControlLabel,
-  Switch,
-  Slider,
   Chip,
-  Alert,
   Divider,
+  FormControlLabel,
+  IconButton,
+  Paper,
+  Slider,
+  Stack,
+  Switch,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
+  Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
-import { Button } from '../components/common/Button';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import AddIcon from '@mui/icons-material/Add';
-import SaveIcon from '@mui/icons-material/Save';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import SaveIcon from '@mui/icons-material/Save';
+import { Button } from '../components/common/Button';
 import { StepIndicator } from '../components/progress/StepIndicator';
 import { BookSearchBar } from '../components/book/BookSearchBar';
-import { ScriptEditor } from '../components/script/ScriptEditor';
-import { SixSegmentView, type SixSegmentItem } from '../components/script/SixSegmentView';
+import { BookCard } from '../components/book/BookCard';
 import { VoiceSelector } from '../components/tts/VoiceSelector';
 import { BGMPicker } from '../components/bgm/BGMPicker';
 import { Loading } from '../components/common/Loading';
+import { bookApi } from '../api/book.api';
 import { projectApi } from '../api/project.api';
-import { scriptApi } from '../api/script.api';
+import { bgmApi } from '../api/bgm.api';
+import { ttsApi } from '../api/tts.api';
 import { useProgress } from '../hooks/useProgress';
 import { useUiStore } from '../store/ui.store';
 import { useProjectStore } from '../store/project.store';
-import { useDebounce } from '../hooks/useDebounce';
-import { bgmApi } from '../api/bgm.api';
-import { ttsApi } from '../api/tts.api';
-import { DEFAULT_HOST_VOICE_ID, DEFAULT_GUEST_VOICE_ID } from '../constants/voices';
-import type { ScriptEmotion, ScriptStage, Speaker } from '@shared/script';
-import type { ProjectMode } from '@shared/project';
+import { localStorageAdapter } from '../storage/local-storage.adapter';
+import { normalizeIsbn } from '../utils/isbn';
+import {
+  DEFAULT_GUEST_VOICE_ID,
+  DEFAULT_HOST_VOICE_ID,
+  VOICE_PRESETS,
+  getVoiceProvider,
+  type VoicePresetId,
+} from '../constants/voices';
+import type { BookMetadata } from '@shared/book';
+import type { ProjectDto, ProjectMode, ScriptTemplate } from '@shared/project';
+import type { ScriptEmotion } from '@shared/script';
 
 const STEPS = [
   { key: 'book', label: '选书' },
-  { key: 'script', label: '写脚本' },
-  { key: 'voice', label: '选音色' },
-  { key: 'bgm', label: '选 BGM' },
-  { key: 'generate', label: '合成' },
+  { key: 'settings', label: '生成设置' },
+  { key: 'generate', label: '生成中' },
 ] as const;
 
-interface PickedBook {
-  isbn: string;
-  title: string;
-  author: string;
-  coverUrl?: string | null;
-  summary?: string | null;
-}
+const SCRIPT_TEMPLATES: Array<{ value: ScriptTemplate; label: string; hint: string }> = [
+  { value: 'audio-overview', label: 'AI 深潜播客', hint: '先策划节目问题，再做双人追问式解读' },
+  { value: 'default', label: '默认六段式', hint: '清晰导读，兼顾信息密度和可听性' },
+  { value: 'deep-review', label: '深度书评', hint: '强化观点、证据、争议和反思' },
+  { value: 'casual-talk', label: '轻松对谈', hint: '更口语、更有来回感，适合泛听' },
+  { value: 'academic', label: '学术解读', hint: '突出概念、脉络和理论框架' },
+];
 
 const FADE_OPTIONS = [
   { label: '0.5s', value: 500 },
@@ -67,117 +75,177 @@ const FADE_OPTIONS = [
   { label: '2s', value: 2000 },
 ];
 
-const generateId = (): string => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const BGM_PRESETS = [
+  {
+    id: 'balanced-reading',
+    name: '均衡导读',
+    description: '轻柔开场，人文底色，适合多数图书播客。',
+    introBgm: 'bgm-relax-1',
+    bodyBgm: 'bgm-human-1',
+    outroBgm: 'bgm-human-2',
+    introVolume: 22,
+    bodyVolume: 12,
+    outroVolume: 20,
+    fadeInMs: 1000,
+    fadeOutMs: 1500,
+  },
+  {
+    id: 'conversation-light',
+    name: '轻松对谈',
+    description: '节奏更明亮，适合新书盘点和多书聊天。',
+    introBgm: 'bgm-relax-2',
+    bodyBgm: 'bgm-relax-3',
+    outroBgm: 'bgm-relax-1',
+    introVolume: 24,
+    bodyVolume: 14,
+    outroVolume: 22,
+    fadeInMs: 500,
+    fadeOutMs: 1000,
+  },
+  {
+    id: 'documentary-depth',
+    name: '深度纪实',
+    description: '低调、克制，适合深度书评和历史议题。',
+    introBgm: 'bgm-doc-1',
+    bodyBgm: 'bgm-doc-3',
+    outroBgm: 'bgm-human-1',
+    introVolume: 20,
+    bodyVolume: 10,
+    outroVolume: 18,
+    fadeInMs: 1000,
+    fadeOutMs: 2000,
+  },
+  {
+    id: 'tech-clean',
+    name: '清爽科技',
+    description: '更现代的背景声，适合商业、科技、趋势类选题。',
+    introBgm: 'bgm-tech-2',
+    bodyBgm: 'bgm-tech-1',
+    outroBgm: 'bgm-tech-3',
+    introVolume: 20,
+    bodyVolume: 10,
+    outroVolume: 18,
+    fadeInMs: 500,
+    fadeOutMs: 1500,
+  },
+] as const;
+
+type BgmPresetId = (typeof BGM_PRESETS)[number]['id'] | 'custom';
+
+const GUEST_PROJECT_IDS_KEY = 'guest.projectIds';
 
 export function ProjectCreate(): JSX.Element {
   const { t } = useTranslation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const push = useUiStore((s) => s.push);
   const setCurrent = useProjectStore((s) => s.setCurrentProject);
-  const current = useProjectStore((s) => s.currentProject);
 
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState<Array<{ isbn: string; reason: string }>>([]);
+  const [project, setProject] = useState<ProjectDto | null>(null);
 
-  // form state
-  const [pickedBooks, setPickedBooks] = useState<PickedBook[]>([]);
+  const [pickedBooks, setPickedBooks] = useState<BookMetadata[]>([]);
   const [mode, setMode] = useState<ProjectMode>('independent');
-  const [scriptText, setScriptText] = useState('');
-  const [scriptMode, setScriptMode] = useState<'simple' | 'segment'>('segment');
-  const [segments, setSegments] = useState<SixSegmentItem[]>([]);
+  const [scriptTemplate, setScriptTemplate] = useState<ScriptTemplate>('audio-overview');
+  const [voicePresetId, setVoicePresetId] = useState<VoicePresetId>('professional-reading');
   const [hostVoice, setHostVoice] = useState(DEFAULT_HOST_VOICE_ID);
   const [guestVoice, setGuestVoice] = useState(DEFAULT_GUEST_VOICE_ID);
   const [hostEmotion, setHostEmotion] = useState<ScriptEmotion>('平缓');
   const [guestEmotion, setGuestEmotion] = useState<ScriptEmotion>('平缓');
+  const [bgmPresetId, setBgmPresetId] = useState<BgmPresetId>('balanced-reading');
   const [introBgm, setIntroBgm] = useState('bgm-relax-1');
-  const [bodyBgm, setBodyBgm] = useState('bgm-tech-1');
-  const [outroBgm, setOutroBgm] = useState('bgm-human-1');
+  const [bodyBgm, setBodyBgm] = useState('bgm-human-1');
+  const [outroBgm, setOutroBgm] = useState('bgm-human-2');
   const [voiceVolume, setVoiceVolume] = useState(80);
-  const [bgmVolume, setBgmVolume] = useState(30);
   const [subtitleEnabled, setSubtitleEnabled] = useState(true);
-  const [bgmVolumeIntro, setBgmVolumeIntro] = useState(50);
-  const [bgmVolumeBody, setBgmVolumeBody] = useState(30);
-  const [bgmVolumeOutro, setBgmVolumeOutro] = useState(50);
+  const [bgmVolumeIntro, setBgmVolumeIntro] = useState(22);
+  const [bgmVolumeBody, setBgmVolumeBody] = useState(12);
+  const [bgmVolumeOutro, setBgmVolumeOutro] = useState(20);
   const [fadeInIntro, setFadeInIntro] = useState(1000);
-  const [fadeOutIntro, setFadeOutIntro] = useState(1000);
+  const [fadeOutIntro, setFadeOutIntro] = useState(1500);
 
-  // seed from query params
-  useEffect(() => {
-    const bookId = searchParams.get('bookId');
-    const title = searchParams.get('title');
-    const author = searchParams.get('author');
-    if (bookId) {
-      setPickedBooks([
-        {
-          isbn: bookId,
-          title: title ?? `Book ${bookId}`,
-          author: author ?? 'Unknown',
-        },
-      ]);
-      push(`已预选图书：${title ?? bookId}`, 'success');
-    }
-    // warm up voice / bgm caches
-    void ttsApi.listVoices().catch(() => null);
-    void bgmApi.list().catch(() => null);
-  }, [searchParams, push]);
-
-  // WS progress for live updates
-  const projectId = current?.id ?? null;
+  const projectId = project?.id ?? null;
   const { progress: liveProgress, stage: liveStage, message: liveMessage, events } = useProgress(projectId);
 
-  // poll current project to detect completion
-  useEffect(() => {
-    if (!current || current.status !== 'generating') return;
-    const t = setInterval(async () => {
+  const resolveBooks = useCallback(
+    async (isbns: string[], source: 'query' | 'search' = 'search'): Promise<void> => {
+      const normalized = isbns
+        .map((isbn) => normalizeIsbn(isbn) ?? isbn.trim())
+        .filter(Boolean)
+        .slice(0, 20);
+      if (normalized.length === 0) return;
+
+      setResolving(true);
+      setError(null);
+      setFailed([]);
       try {
-        const p = await projectApi.get(current.id);
-        setCurrent(p);
-        if (p.status === 'done') {
-          clearInterval(t);
+        const response = await bookApi.resolveMetadata(normalized);
+        setPickedBooks(response.items);
+        setFailed(response.failed);
+        if (response.items.length > 1) {
+          setMode('merged');
+        }
+        if (response.items.length === 0) {
+          setError('没有获取到可用于生成的图书信息，请检查 ISBN 后重试');
+          push('没有获取到图书信息', 'warning');
+        } else {
+          push(source === 'query' ? '已加载预选图书' : `已加载 ${response.items.length} 本书`, 'success');
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : '未知错误';
+        setPickedBooks([]);
+        setError(`图书信息获取失败：${message}`);
+        push('图书信息获取失败', 'error');
+      } finally {
+        setResolving(false);
+      }
+    },
+    [push],
+  );
+
+  useEffect(() => {
+    setCurrent(null);
+    const repeatedBookIds = searchParams.getAll('bookId');
+    const packedBookIds = searchParams.get('bookIds')?.split(/[\s,;]+/).filter(Boolean) ?? [];
+    const bookIds = repeatedBookIds.length > 0 ? repeatedBookIds : packedBookIds;
+    if (bookIds.length > 0) {
+      void resolveBooks(bookIds, 'query');
+    }
+    void ttsApi.listVoices().catch(() => null);
+    void bgmApi.list().catch(() => null);
+  }, [searchParams, resolveBooks, setCurrent]);
+
+  useEffect(() => {
+    if (!project || project.status !== 'generating') return;
+    const timer = setInterval(async () => {
+      try {
+        const fresh = await projectApi.get(project.id);
+        setProject(fresh);
+        setCurrent(fresh);
+        if (fresh.status === 'done') {
+          clearInterval(timer);
           push('生成完成！', 'success');
-          navigate(`/projects/${p.id}`);
-        } else if (p.status === 'failed') {
-          clearInterval(t);
+          navigate(`/projects/${fresh.id}`);
+        } else if (fresh.status === 'failed') {
+          clearInterval(timer);
+          setError('生成失败，请稍后重试或打开项目详情查看错误');
           push('生成失败，请稍后重试', 'error');
-        } else if (p.status === 'cancelled') {
-          clearInterval(t);
-          push('已取消', 'info');
         }
       } catch {
-        // ignore
+        // Polling failures should not interrupt the visible progress stream.
       }
     }, 4000);
-    return () => clearInterval(t);
-  }, [current, setCurrent, navigate, push]);
+    return () => clearInterval(timer);
+  }, [project, navigate, push, setCurrent]);
 
-  // seed default 6-segment structure on first visit to step 2
-  useEffect(() => {
-    if (step === 2 && segments.length === 0 && scriptMode === 'segment') {
-      const stages: ScriptStage[] = ['intro', 'introduce', 'interpret', 'review', 'suggest', 'closing'];
-      const speakers: Speaker[] = ['host', 'guest', 'host', 'guest', 'host', 'guest'];
-      setSegments(
-        stages.map((s, i) => ({
-          id: generateId(),
-          speaker: speakers[i],
-          stage: s,
-          text: '',
-          emotion: '平缓',
-        })),
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, scriptMode]);
-
-  // debounce script changes for autosave (when editing an existing project)
-  const debouncedScript = useDebounce(scriptText, 1500);
-  useEffect(() => {
-    if (current && current.status !== 'generating' && debouncedScript && debouncedScript !== current.scriptId) {
-      // best-effort autosave; we don't have an explicit PUT script endpoint here
-      // beyond scriptApi.save, which requires a generated script. Skip silently.
-    }
-  }, [debouncedScript, current]);
+  const selectedPreset = VOICE_PRESETS.find((preset) => preset.id === voicePresetId) ?? VOICE_PRESETS[0];
+  const selectedTemplate = SCRIPT_TEMPLATES.find((tpl) => tpl.value === scriptTemplate) ?? SCRIPT_TEMPLATES[0];
 
   const goNext = useCallback((): void => {
     setError(null);
@@ -185,104 +253,109 @@ export function ProjectCreate(): JSX.Element {
       setError('请至少选择一本书');
       return;
     }
-    if (step === 2) {
-      if (scriptMode === 'simple' && !scriptText.trim()) {
-        setError('请填写脚本内容');
-        return;
-      }
-      if (scriptMode === 'segment' && segments.every((s) => !s.text.trim())) {
-        setError('请至少填写一段台词');
-        return;
-      }
-    }
-    setStep((s) => Math.min(STEPS.length, s + 1));
-  }, [step, pickedBooks.length, scriptText, scriptMode, segments]);
+    setStep((value) => Math.min(STEPS.length, value + 1));
+  }, [step, pickedBooks.length]);
 
   const goPrev = useCallback((): void => {
     setError(null);
-    setStep((s) => Math.max(1, s - 1));
+    setStep((value) => Math.max(1, value - 1));
   }, []);
 
+  const applyVoicePreset = (id: VoicePresetId): void => {
+    const preset = VOICE_PRESETS.find((item) => item.id === id);
+    if (!preset) return;
+    setVoicePresetId(id);
+    setHostVoice(preset.hostVoiceId);
+    setGuestVoice(preset.guestVoiceId);
+  };
+
+  const applyBgmPreset = (id: BgmPresetId): void => {
+    setBgmPresetId(id);
+    if (id === 'custom') return;
+    const preset = BGM_PRESETS.find((item) => item.id === id);
+    if (!preset) return;
+    setIntroBgm(preset.introBgm);
+    setBodyBgm(preset.bodyBgm);
+    setOutroBgm(preset.outroBgm);
+    setBgmVolumeIntro(preset.introVolume);
+    setBgmVolumeBody(preset.bodyVolume);
+    setBgmVolumeOutro(preset.outroVolume);
+    setFadeInIntro(preset.fadeInMs);
+    setFadeOutIntro(preset.fadeOutMs);
+  };
+
+  const markCustomBgm = (): void => setBgmPresetId('custom');
+
   const handleCreate = async (): Promise<void> => {
+    if (pickedBooks.length === 0) {
+      setError('请至少选择一本书');
+      setStep(1);
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
-      // build payload
-      const isbns = pickedBooks.map((b) => b.isbn);
+      const isbns = pickedBooks.map((book) => book.isbn);
+      const title =
+        pickedBooks.length === 1
+          ? `${pickedBooks[0].title} 播客`
+          : `${pickedBooks[0].title} 等 ${pickedBooks.length} 本书播客`;
+
       const created = await projectApi.create({
-        title: pickedBooks[0]?.title ?? '新播客',
+        title,
         mode,
         isbns,
+        books: pickedBooks,
+        scriptTemplate,
         voices: [
-          { role: 'host', voiceId: hostVoice, provider: 'volcengine' },
-          { role: 'guest', voiceId: guestVoice, provider: 'volcengine' },
+          { role: 'host', voiceId: hostVoice, provider: getVoiceProvider(hostVoice) },
+          { role: 'guest', voiceId: guestVoice, provider: getVoiceProvider(guestVoice) },
         ],
         bgmConfigs: [
-          { segment: 'intro', bgmTrackId: introBgm, volume: bgmVolumeIntro, fadeInMs: fadeInIntro, fadeOutMs: fadeOutIntro },
+          {
+            segment: 'intro',
+            bgmTrackId: introBgm,
+            volume: bgmVolumeIntro,
+            fadeInMs: fadeInIntro,
+            fadeOutMs: fadeOutIntro,
+          },
           { segment: 'body', bgmTrackId: bodyBgm, volume: bgmVolumeBody, fadeInMs: 1000, fadeOutMs: 1000 },
           { segment: 'outro', bgmTrackId: outroBgm, volume: bgmVolumeOutro, fadeInMs: 1000, fadeOutMs: 1000 },
         ],
         voiceVolume,
         subtitleEnabled,
       });
-      setCurrent(created);
 
-      // best-effort: save the script if the user wrote one
-      if (scriptMode === 'simple' && scriptText.trim()) {
-        try {
-          await scriptApi.save(created.id, {
-            content: JSON.stringify({ text: scriptText }),
-            rawText: scriptText,
-            segments: [],
-          });
-        } catch {
-          // non-fatal
-        }
-      } else if (scriptMode === 'segment' && segments.some((s) => s.text.trim())) {
-        try {
-          const rawText = segments
-            .filter((s) => s.text.trim())
-            .map((s) => `${s.speaker === 'host' ? '主持人' : '嘉宾'}: ${s.text}`)
-            .join('\n');
-          await scriptApi.save(created.id, {
-            content: JSON.stringify({ segments }),
-            rawText,
-            segments: segments
-              .filter((s) => s.text.trim())
-              .map((s, i) => ({
-                orderIndex: i,
-                speaker: s.speaker,
-                text: s.text,
-                emotion: s.emotion,
-                stage: s.stage,
-              })),
-          });
-        } catch {
-          // non-fatal
-        }
+      setProject(created);
+      setCurrent(created);
+      const guestIds = localStorageAdapter.get<string[]>(GUEST_PROJECT_IDS_KEY) ?? [];
+      if (!created.userId && !guestIds.includes(created.id)) {
+        localStorageAdapter.set(GUEST_PROJECT_IDS_KEY, [...guestIds, created.id]);
       }
 
-      // trigger generation pipeline
-      const r = await projectApi.generate(created.id);
-      void r;
+      const started = await projectApi.generate(created.id, { scriptTemplate });
+      const generatingProject = started.project ?? { ...created, status: 'generating' as const, progress: 0, currentStage: 'script' as const };
+      setProject(generatingProject);
+      setCurrent(generatingProject);
+      setStep(3);
       push('项目已创建并开始生成', 'success');
-      setStep(5);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '创建失败');
-      push(e instanceof Error ? e.message : '创建失败', 'error');
+      const message = e instanceof Error ? e.message : '创建或启动生成失败';
+      setError(message);
+      push(message, 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const progress = current?.progress ?? liveProgress;
-  const stage = current?.currentStage ?? liveStage;
-  const statusMessage = liveMessage || '准备中…';
-
+  const progress = project?.progress ?? liveProgress;
+  const stage = project?.currentStage ?? liveStage;
+  const statusMessage = liveMessage || (project ? '生成任务已启动' : '准备开始生成');
   const isFinalStep = step === STEPS.length;
 
   return (
-    <Box sx={{ maxWidth: 960, mx: 'auto' }}>
+    <Box sx={{ maxWidth: 1040, mx: 'auto' }}>
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
         <Tooltip title="返回仪表盘">
           <IconButton onClick={() => navigate('/dashboard')} aria-label="back to dashboard">
@@ -293,18 +366,18 @@ export function ProjectCreate(): JSX.Element {
           {t('projectCreate.title')}
         </Typography>
         <Box sx={{ flex: 1 }} />
-        {current && (
+        {project && (
           <Chip
             size="small"
-            color={current.status === 'done' ? 'success' : current.status === 'failed' ? 'error' : 'primary'}
-            label={current.status}
+            color={project.status === 'done' ? 'success' : project.status === 'failed' ? 'error' : 'primary'}
+            label={project.status}
             variant="outlined"
           />
         )}
       </Stack>
 
       <Box sx={{ mb: 3 }}>
-        <StepIndicator steps={STEPS.map((s) => ({ key: s.key, label: s.label }))} current={step} />
+        <StepIndicator steps={STEPS.map((item) => ({ key: item.key, label: item.label }))} current={step} />
       </Box>
 
       {error && (
@@ -312,52 +385,28 @@ export function ProjectCreate(): JSX.Element {
           {error}
         </Alert>
       )}
+      {failed.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          未获取到 {failed.length} 本书：{failed.map((item) => item.isbn).join('、')}
+        </Alert>
+      )}
 
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, mb: 3, minHeight: 320 }}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, mb: 3, minHeight: 360 }}>
         {step === 1 && (
           <Stack spacing={3}>
             <Box>
               <Typography variant="h6" fontWeight={600} gutterBottom>
-                ① 选书（可批量导入 ISBN）
+                选书
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                粘贴或输入 ISBN，自动从豆瓣/Google Books 拉取元数据。
-              </Typography>
-              <BookSearchBar
-                onSearch={async (isbns) => {
-                  try {
-                    const r = await import('../api/book.api').then((m) =>
-                      m.bookApi.fetchMetadata(isbns, 'tmp'),
-                    );
-                    const items = r.items ?? [];
-                    setPickedBooks(
-                      items.map((it) => ({
-                        isbn: it.isbn,
-                        title: it.title,
-                        author: it.author,
-                        coverUrl: it.coverUrl,
-                        summary: it.summary,
-                      })),
-                    );
-                    push(`已加载 ${items.length} 本书`, 'success');
-                  } catch {
-                    setPickedBooks(
-                      isbns.map((isbn) => ({
-                        isbn,
-                        title: `示例书名 (${isbn})`,
-                        author: '示例作者',
-                      })),
-                    );
-                    push('使用占位数据 (后端无响应)', 'warning');
-                  }
-                }}
-              />
+              <BookSearchBar onSearch={(isbns) => void resolveBooks(isbns)} />
             </Box>
 
-            {pickedBooks.length > 0 && (
-              <Box>
-                <Divider sx={{ mb: 2 }} />
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+            {resolving ? (
+              <Loading label={t('book.fetching')} />
+            ) : pickedBooks.length > 0 ? (
+              <Stack spacing={2}>
+                <Divider />
+                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
                   <Typography variant="subtitle1" fontWeight={600}>
                     已选 {pickedBooks.length} 本
                   </Typography>
@@ -365,82 +414,136 @@ export function ProjectCreate(): JSX.Element {
                     size="small"
                     exclusive
                     value={mode}
-                    onChange={(_, v) => v && setMode(v as ProjectMode)}
+                    onChange={(_, value) => value && setMode(value as ProjectMode)}
                   >
                     <ToggleButton value="independent">逐本独立</ToggleButton>
                     <ToggleButton value="merged">合并为单期</ToggleButton>
                   </ToggleButtonGroup>
                 </Stack>
-                <Stack spacing={1}>
-                  {pickedBooks.map((b) => (
-                    <Card key={b.isbn} variant="outlined">
-                      <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                        <Stack direction="row" alignItems="center" spacing={1.5}>
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="body2" fontWeight={600} noWrap>
-                              {b.title}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" noWrap>
-                              {b.author} · {b.isbn}
-                            </Typography>
-                          </Box>
-                          <Tooltip title="移除">
-                            <IconButton
-                              size="small"
-                              onClick={() => setPickedBooks((arr) => arr.filter((x) => x.isbn !== b.isbn))}
-                              aria-label="remove"
-                            >
-                              ×
-                            </IconButton>
-                          </Tooltip>
-                        </Stack>
-                      </CardContent>
-                    </Card>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gap: 2,
+                    gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
+                  }}
+                >
+                  {pickedBooks.map((book) => (
+                    <BookCard
+                      key={`${book.isbn}-${book.source}`}
+                      book={book}
+                      selected
+                      onRemove={(target) => setPickedBooks((items) => items.filter((item) => item.isbn !== target.isbn))}
+                    />
                   ))}
-                </Stack>
-              </Box>
+                </Box>
+              </Stack>
+            ) : (
+              <Alert severity="info">从图书整理页选择书籍，或在这里输入 ISBN 后开始生成。</Alert>
             )}
           </Stack>
         )}
 
         {step === 2 && (
-          <Stack spacing={2}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
-              <Typography variant="h6" fontWeight={600}>
-                ② 撰写脚本
+          <Stack spacing={3}>
+            <Box>
+              <Typography variant="h6" fontWeight={600} gutterBottom>
+                生成设置
               </Typography>
-              <ToggleButtonGroup
-                size="small"
-                exclusive
-                value={scriptMode}
-                onChange={(_, v) => v && setScriptMode(v)}
-              >
-                <ToggleButton value="segment">{t('projectCreate.segmentMode')}</ToggleButton>
-                <ToggleButton value="simple">{t('projectCreate.scriptMode')}</ToggleButton>
-              </ToggleButtonGroup>
-            </Stack>
-            {scriptMode === 'simple' ? (
-              <TextField
-                multiline
-                minRows={10}
-                maxRows={20}
-                fullWidth
-                value={scriptText}
-                onChange={(e) => setScriptText(e.target.value)}
-                placeholder={`主持人: 大家好，欢迎收听本期节目...\n嘉宾: ...`}
-                inputProps={{ 'aria-label': 'script text' }}
-              />
-            ) : (
-              <SixSegmentView value={segments} onChange={setSegments} />
-            )}
-          </Stack>
-        )}
+              <Typography variant="body2" color="text.secondary">
+                AI 将基于已选书籍自动生成双人对谈脚本。
+              </Typography>
+            </Box>
 
-        {step === 3 && (
-          <Stack spacing={2}>
-            <Typography variant="h6" fontWeight={600}>
-              ③ 选音色
-            </Typography>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+                脚本模板
+              </Typography>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 1.5,
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+                }}
+              >
+                {SCRIPT_TEMPLATES.map((template) => {
+                  const active = template.value === scriptTemplate;
+                  return (
+                    <Card
+                      key={template.value}
+                      variant="outlined"
+                      onClick={() => setScriptTemplate(template.value)}
+                      sx={{
+                        cursor: 'pointer',
+                        borderColor: active ? 'primary.main' : 'divider',
+                        bgcolor: active ? 'action.selected' : 'background.paper',
+                      }}
+                    >
+                      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                        <Stack spacing={0.75}>
+                          <Stack direction="row" spacing={0.75} alignItems="center">
+                            {active ? <CheckCircleIcon color="primary" fontSize="small" /> : <RadioButtonUncheckedIcon fontSize="small" />}
+                            <Typography variant="subtitle2" fontWeight={700}>
+                              {template.label}
+                            </Typography>
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary">
+                            {template.hint}
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </Box>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+                声音方案
+              </Typography>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 1.5,
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+                }}
+              >
+                {VOICE_PRESETS.map((preset) => {
+                  const active = preset.id === voicePresetId;
+                  return (
+                    <Card
+                      key={preset.id}
+                      variant="outlined"
+                      onClick={() => applyVoicePreset(preset.id)}
+                      sx={{
+                        cursor: 'pointer',
+                        borderColor: active ? 'primary.main' : 'divider',
+                        bgcolor: active ? 'action.selected' : 'background.paper',
+                      }}
+                    >
+                      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                        <Stack spacing={0.75}>
+                          <Stack direction="row" spacing={0.75} alignItems="center">
+                            {active ? <CheckCircleIcon color="primary" fontSize="small" /> : <RadioButtonUncheckedIcon fontSize="small" />}
+                            <Typography variant="subtitle2" fontWeight={700}>
+                              {preset.name}
+                            </Typography>
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary">
+                            {preset.description}
+                          </Typography>
+                          <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                            <Chip size="small" label={`主持人 ${preset.hostVoiceId}`} variant="outlined" />
+                            <Chip size="small" label={`嘉宾 ${preset.guestVoiceId}`} variant="outlined" />
+                          </Stack>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </Box>
+            </Box>
+
             <Box
               sx={{
                 display: 'grid',
@@ -463,58 +566,129 @@ export function ProjectCreate(): JSX.Element {
                 onEmotionChange={setGuestEmotion}
               />
             </Box>
+
             <Card variant="outlined">
               <CardContent>
-                <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
-                  全局音量
-                </Typography>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
                   <Box sx={{ flex: 1, width: '100%' }}>
                     <Typography variant="caption">人声音量 {voiceVolume}%</Typography>
                     <Slider
                       value={voiceVolume}
                       min={0}
                       max={100}
-                      onChange={(_, v) => setVoiceVolume(typeof v === 'number' ? v : v[0])}
+                      onChange={(_, value) => setVoiceVolume(typeof value === 'number' ? value : value[0])}
                     />
                   </Box>
-                  <Divider orientation="vertical" flexItem />
-                  <Box sx={{ flex: 1, width: '100%' }}>
-                    <Typography variant="caption">BGM 音量 {bgmVolume}%</Typography>
-                    <Slider
-                      value={bgmVolume}
-                      min={0}
-                      max={100}
-                      onChange={(_, v) => setBgmVolume(typeof v === 'number' ? v : v[0])}
-                    />
-                  </Box>
-                  <Divider orientation="vertical" flexItem />
                   <FormControlLabel
-                    control={<Switch checked={subtitleEnabled} onChange={(_, v) => setSubtitleEnabled(v)} />}
+                    control={<Switch checked={subtitleEnabled} onChange={(_, value) => setSubtitleEnabled(value)} />}
                     label={`字幕 ${subtitleEnabled ? t('config.on') : t('config.off')}`}
                   />
                 </Stack>
               </CardContent>
             </Card>
-          </Stack>
-        )}
 
-        {step === 4 && (
-          <Stack spacing={2}>
-            <Typography variant="h6" fontWeight={600}>
-              ④ 选 BGM
-            </Typography>
-            <Box
-              sx={{
-                display: 'grid',
-                gap: 2,
-                gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
-              }}
-            >
-              <BGMPicker segment="intro" value={introBgm} onChange={setIntroBgm} volume={bgmVolumeIntro} onVolumeChange={setBgmVolumeIntro} />
-              <BGMPicker segment="body" value={bodyBgm} onChange={setBodyBgm} volume={bgmVolumeBody} onVolumeChange={setBgmVolumeBody} />
-              <BGMPicker segment="outro" value={outroBgm} onChange={setOutroBgm} volume={bgmVolumeOutro} onVolumeChange={setBgmVolumeOutro} />
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+                BGM 模板
+              </Typography>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 1.5,
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+                }}
+              >
+                {BGM_PRESETS.map((preset) => {
+                  const active = bgmPresetId === preset.id;
+                  return (
+                    <Card
+                      key={preset.id}
+                      variant="outlined"
+                      onClick={() => applyBgmPreset(preset.id)}
+                      sx={{
+                        cursor: 'pointer',
+                        borderColor: active ? 'primary.main' : 'divider',
+                        bgcolor: active ? 'action.selected' : 'background.paper',
+                      }}
+                    >
+                      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                        <Stack spacing={0.75}>
+                          <Stack direction="row" spacing={0.75} alignItems="center">
+                            {active ? <CheckCircleIcon color="primary" fontSize="small" /> : <RadioButtonUncheckedIcon fontSize="small" />}
+                            <Typography variant="subtitle2" fontWeight={700}>
+                              {preset.name}
+                            </Typography>
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary">
+                            {preset.description}
+                          </Typography>
+                          <Chip size="small" label={`正片 ${preset.bodyVolume}%`} variant="outlined" sx={{ alignSelf: 'flex-start' }} />
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </Box>
+              {bgmPresetId === 'custom' && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  当前为自定义 BGM 配置
+                </Typography>
+              )}
             </Box>
+
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+                BGM 细节
+              </Typography>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 2,
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+                }}
+              >
+                <BGMPicker
+                  segment="intro"
+                  value={introBgm}
+                  onChange={(value) => {
+                    markCustomBgm();
+                    setIntroBgm(value);
+                  }}
+                  volume={bgmVolumeIntro}
+                  onVolumeChange={(value) => {
+                    markCustomBgm();
+                    setBgmVolumeIntro(value);
+                  }}
+                />
+                <BGMPicker
+                  segment="body"
+                  value={bodyBgm}
+                  onChange={(value) => {
+                    markCustomBgm();
+                    setBodyBgm(value);
+                  }}
+                  volume={bgmVolumeBody}
+                  onVolumeChange={(value) => {
+                    markCustomBgm();
+                    setBgmVolumeBody(value);
+                  }}
+                />
+                <BGMPicker
+                  segment="outro"
+                  value={outroBgm}
+                  onChange={(value) => {
+                    markCustomBgm();
+                    setOutroBgm(value);
+                  }}
+                  volume={bgmVolumeOutro}
+                  onVolumeChange={(value) => {
+                    markCustomBgm();
+                    setBgmVolumeOutro(value);
+                  }}
+                />
+              </Box>
+            </Box>
+
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
@@ -526,13 +700,16 @@ export function ProjectCreate(): JSX.Element {
                     size="small"
                     label="渐入"
                     value={fadeInIntro}
-                    onChange={(e) => setFadeInIntro(Number((e.target as HTMLInputElement).value))}
+                    onChange={(event) => {
+                      markCustomBgm();
+                      setFadeInIntro(Number(event.target.value));
+                    }}
                     sx={{ minWidth: 120 }}
                     SelectProps={{ native: true }}
                   >
-                    {FADE_OPTIONS.map((f) => (
-                      <option key={f.value} value={f.value}>
-                        {f.label}
+                    {FADE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
                       </option>
                     ))}
                   </TextField>
@@ -541,13 +718,16 @@ export function ProjectCreate(): JSX.Element {
                     size="small"
                     label="渐出"
                     value={fadeOutIntro}
-                    onChange={(e) => setFadeOutIntro(Number((e.target as HTMLInputElement).value))}
+                    onChange={(event) => {
+                      markCustomBgm();
+                      setFadeOutIntro(Number(event.target.value));
+                    }}
                     sx={{ minWidth: 120 }}
                     SelectProps={{ native: true }}
                   >
-                    {FADE_OPTIONS.map((f) => (
-                      <option key={f.value} value={f.value}>
-                        {f.label}
+                    {FADE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
                       </option>
                     ))}
                   </TextField>
@@ -557,22 +737,23 @@ export function ProjectCreate(): JSX.Element {
           </Stack>
         )}
 
-        {step === 5 && (
+        {step === 3 && (
           <Stack spacing={2}>
             <Typography variant="h6" fontWeight={600}>
-              ⑤ 合成与生成
+              生成中
             </Typography>
 
-            {!current ? (
+            {!project ? (
               <Card variant="outlined">
                 <CardContent>
                   <Stack spacing={2} alignItems="center" sx={{ py: 3 }}>
                     <RocketLaunchIcon sx={{ fontSize: 48, color: 'primary.main' }} aria-hidden />
-                    <Typography>确认所有配置后点击「开始生成」</Typography>
-                    <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <Typography fontWeight={600}>确认后开始生成播客</Typography>
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', justifyContent: 'center', gap: 1 }}>
                       <Chip label={`${pickedBooks.length} 本书`} />
-                      <Chip label={`${scriptMode === 'simple' ? scriptText.length : segments.length} 段脚本`} />
-                      <Chip label={`${hostVoice} / ${guestVoice}`} />
+                      <Chip label={selectedTemplate.label} />
+                      <Chip label={selectedPreset.name} />
+                      <Chip label="双人对谈" />
                       <Chip label="3 段 BGM" />
                     </Stack>
                     <Button
@@ -588,85 +769,92 @@ export function ProjectCreate(): JSX.Element {
                 </CardContent>
               </Card>
             ) : (
-              <Box>
-                {progress < 100 && progress > 0 && <Loading fullScreen label="生成中..." />}
-                <Stack spacing={1.5}>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">
-                      状态：{current.status} · 进度：{Math.round(progress)}%
-                    </Typography>
-                    <Box sx={{ height: 8, bgcolor: 'grey.200', borderRadius: 4, overflow: 'hidden', mt: 1 }}>
-                      <Box
-                        sx={{
-                          height: '100%',
-                          width: `${Math.max(0, Math.min(100, progress))}%`,
-                          bgcolor: 'primary.main',
-                          transition: 'width 0.4s',
-                        }}
-                      />
-                    </Box>
-                  </Box>
-                  <Typography variant="body2">当前阶段：{stage ?? '准备'}</Typography>
+              <Stack spacing={1.5}>
+                {progress < 100 && progress > 0 && <Loading label="生成中..." />}
+                <Box>
                   <Typography variant="body2" color="text.secondary">
-                    {statusMessage}
+                    状态：{project.status} · 进度：{Math.round(progress)}%
                   </Typography>
-                  {events.length > 0 && (
-                    <Box sx={{ maxHeight: 160, overflowY: 'auto', mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
-                      {events.slice(-10).reverse().map((e, i) => (
-                        <Typography key={i} variant="caption" component="div" color="text.secondary">
-                          {new Date(e.timestamp).toLocaleTimeString()} · {e.stage} · {e.message}
-                        </Typography>
-                      ))}
-                    </Box>
-                  )}
-                  {current.status === 'done' && (
-                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                      <Button variant="contained" onClick={() => navigate(`/projects/${current.id}`)}>
-                        打开项目
-                      </Button>
-                      <Button variant="outlined" startIcon={<SaveIcon />} onClick={() => navigate('/dashboard')}>
-                        返回仪表盘
-                      </Button>
-                    </Stack>
-                  )}
+                  <Box sx={{ height: 8, bgcolor: 'grey.200', borderRadius: 4, overflow: 'hidden', mt: 1 }}>
+                    <Box
+                      sx={{
+                        height: '100%',
+                        width: `${Math.max(0, Math.min(100, progress))}%`,
+                        bgcolor: 'primary.main',
+                        transition: 'width 0.4s',
+                      }}
+                    />
+                  </Box>
+                </Box>
+                <Typography variant="body2">当前阶段：{stage ?? '准备'}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {statusMessage}
+                </Typography>
+                {events.length > 0 && (
+                  <Box sx={{ maxHeight: 160, overflowY: 'auto', mt: 1, p: 1, bgcolor: 'grey.50', borderRadius: 1 }}>
+                    {events.slice(-10).reverse().map((event, index) => (
+                      <Typography key={index} variant="caption" component="div" color="text.secondary">
+                        {new Date(event.timestamp).toLocaleTimeString()} · {event.stage} · {event.message}
+                      </Typography>
+                    ))}
+                  </Box>
+                )}
+                <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                  <Button variant="contained" onClick={() => navigate(`/projects/${project.id}`)}>
+                    打开项目
+                  </Button>
+                  <Button variant="outlined" startIcon={<SaveIcon />} onClick={() => navigate('/dashboard')}>
+                    返回仪表盘
+                  </Button>
                 </Stack>
-              </Box>
+              </Stack>
             )}
           </Stack>
         )}
       </Paper>
 
-      {/* Navigation buttons */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={goPrev}
-          disabled={step === 1 || submitting}
-        >
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        spacing={1}
+        sx={{
+          ...(isMobile
+            ? {
+                position: 'sticky',
+                bottom: 0,
+                zIndex: 10,
+                bgcolor: 'background.paper',
+                borderTop: 1,
+                borderColor: 'divider',
+                py: 1,
+              }
+            : {}),
+        }}
+      >
+        <Button startIcon={<ArrowBackIcon />} onClick={goPrev} disabled={step === 1 || submitting}>
           {t('common.prev')}
         </Button>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Typography variant="caption" color="text.secondary">
-            第 {step} / {STEPS.length} 步
-          </Typography>
-        </Stack>
+        <Typography variant="caption" color="text.secondary">
+          第 {step} / {STEPS.length} 步
+        </Typography>
         {!isFinalStep ? (
           <Button
             variant="contained"
             endIcon={<ArrowForwardIcon />}
             onClick={goNext}
-            disabled={submitting}
+            disabled={submitting || resolving}
           >
             {t('common.next')}
           </Button>
         ) : (
           <Button
             variant="contained"
-            endIcon={current ? <SaveIcon /> : <AddIcon />}
-            onClick={current ? () => navigate(`/projects/${current.id}`) : () => void handleCreate()}
+            endIcon={project ? <SaveIcon /> : <RocketLaunchIcon />}
+            onClick={project ? () => navigate(`/projects/${project.id}`) : () => void handleCreate()}
             disabled={submitting}
           >
-            {current ? '查看项目' : t('common.startGenerate')}
+            {project ? '查看项目' : t('common.startGenerate')}
           </Button>
         )}
       </Stack>

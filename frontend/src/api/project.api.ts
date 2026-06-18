@@ -1,5 +1,13 @@
 import { request } from './client';
-import type { ProjectDto, CreateProjectPayload, UpdateConfigPayload } from '@shared/project';
+import type {
+  ProjectDto,
+  CreateProjectPayload,
+  UpdateConfigPayload,
+  SyncProjectsResult,
+  ShareLinkDto,
+  GenerateProjectPayload,
+  RegenerateProjectPayload,
+} from '@shared/project';
 import type { PaginatedResult } from '@shared/api';
 
 export const projectApi = {
@@ -15,13 +23,36 @@ export const projectApi = {
   async list(page = 1, pageSize = 20): Promise<PaginatedResult<ProjectDto>> {
     return request<PaginatedResult<ProjectDto>>({ method: 'GET', url: '/projects', params: { page, pageSize } });
   },
-  async generate(id: string): Promise<{ accepted: true; jobIds: Record<string, string> }> {
-    return request<{ accepted: true; jobIds: Record<string, string> }>({ method: 'POST', url: `/projects/${id}/generate` });
+  async generate(
+    id: string,
+    payload?: GenerateProjectPayload,
+  ): Promise<{ accepted: true; jobIds: Record<string, string>; project?: ProjectDto }> {
+    return request<{ accepted: true; jobIds: Record<string, string>; project?: ProjectDto }>({
+      method: 'POST',
+      url: `/projects/${id}/generate`,
+      data: payload ?? {},
+    });
   },
-  async cancel(id: string): Promise<{ cancelled: number }> {
-    return request<{ cancelled: number }>({ method: 'POST', url: `/projects/${id}/cancel` });
+  async cancel(id: string): Promise<{ cancelled: number; project: ProjectDto }> {
+    return request<{ cancelled: number; project: ProjectDto }>({ method: 'POST', url: `/projects/${id}/cancel` });
   },
-  async regenerate(id: string): Promise<{ accepted: true }> {
-    return request<{ accepted: true }>({ method: 'POST', url: `/projects/${id}/regenerate` });
+  async regenerate(
+    id: string,
+    payload?: RegenerateProjectPayload,
+  ): Promise<{ accepted: true; jobIds: Record<string, string>; project: ProjectDto }> {
+    return request<{ accepted: true; jobIds: Record<string, string>; project: ProjectDto }>({
+      method: 'POST',
+      url: `/projects/${id}/regenerate`,
+      data: payload ?? {},
+    });
+  },
+  async remove(id: string): Promise<null> {
+    return request<null>({ method: 'DELETE', url: `/projects/${id}` });
+  },
+  async sync(projectIds: string[]): Promise<SyncProjectsResult> {
+    return request<SyncProjectsResult>({ method: 'POST', url: '/projects/sync', data: { projectIds } });
+  },
+  async createShare(id: string): Promise<ShareLinkDto> {
+    return request<ShareLinkDto>({ method: 'POST', url: `/projects/${id}/share` });
   },
 };

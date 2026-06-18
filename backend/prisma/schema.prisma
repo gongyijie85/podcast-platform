@@ -31,7 +31,9 @@ model Project {
   id           String   @id @default(uuid())
   userId       String?  @map("user_id")
   title        String
+  coverUrl     String?  @map("cover_url")
   mode         String   // independent | merged
+  scriptTemplate String? @map("script_template")
   status       String   @default("draft") // draft|generating|done|failed|cancelled|partial
   progress     Int      @default(0)
   currentStage String?  @map("current_stage")
@@ -48,10 +50,25 @@ model Project {
   voices      VoiceConfig[]
   bgmConfigs  BgmConfig[]
   jobs        Job[]
+  shareLinks  ShareLink[]
 
   @@index([userId])
   @@index([status])
   @@map("projects")
+}
+
+model ShareLink {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([expiresAt])
+  @@map("share_links")
 }
 
 model ProjectBook {
@@ -62,12 +79,40 @@ model ProjectBook {
   author     String
   coverUrl   String?  @map("cover_url")
   summary    String?  @db.Text
+  publisher  String?
+  publishedDate String? @map("published_date")
+  metadataSource String? @map("metadata_source")
+  podcastAngle String? @db.Text @map("podcast_angle")
   orderIndex Int      @default(0) @map("order_index")
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@map("project_books")
+}
+
+model BookLibraryItem {
+  id            String   @id @default(uuid())
+  isbn          String   @unique
+  title         String
+  author        String
+  coverUrl      String?  @map("cover_url")
+  summary       String?  @db.Text
+  publisher     String?
+  publishedDate String?  @map("published_date")
+  pageCount     Int?     @map("page_count")
+  source        String
+  category      String?
+  categoryName  String?  @map("category_name")
+  rank          Int?
+  queryCount    Int      @default(1) @map("query_count")
+  firstSeenAt   DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt    DateTime @updatedAt @map("last_seen_at")
+
+  @@index([source])
+  @@index([category])
+  @@index([lastSeenAt])
+  @@map("book_library_items")
 }
 
 model Script {

@@ -6,6 +6,8 @@ import { ProgressGateway } from '../ws/progress.gateway';
 import { randomUUID } from 'node:crypto';
 import type { ProgressEvent } from '@shared/job';
 import { STAGE_WEIGHTS } from '../queue/constants';
+import { BgmService } from '../bgm/bgm.service';
+import type { BgmCategory } from '@shared/book';
 
 @Injectable()
 export class MixService {
@@ -15,6 +17,7 @@ export class MixService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly progress: ProgressGateway,
+    private readonly bgm: BgmService,
   ) {}
 
   async mixProject(projectId: string): Promise<{ key: string; durationMs: number; sizeBytes: number }> {
@@ -48,9 +51,16 @@ export class MixService {
     let bgmBuffer: Buffer | null = null;
     if (bodyBgm) {
       try {
+        await this.bgm.ensureTrackAudio({
+          id: bodyBgm.bgmTrack.id,
+          name: bodyBgm.bgmTrack.name,
+          category: bodyBgm.bgmTrack.category as BgmCategory,
+          storageKey: bodyBgm.bgmTrack.storageKey,
+          durationMs: bodyBgm.bgmTrack.durationMs,
+        });
         bgmBuffer = await this.storage.get(bodyBgm.bgmTrack.storageKey);
-      } catch {
-        // BGM file not in storage - skip silently
+      } catch (err) {
+        this.logger.warn(`BGM unavailable for project=${projectId} track=${bodyBgm.bgmTrackId}: ${(err as Error).message}`);
         bgmBuffer = null;
       }
     }

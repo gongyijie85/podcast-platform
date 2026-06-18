@@ -5,26 +5,59 @@ import axiosRetry from 'axios-retry';
 import type { BookApiAdapter } from './book-api.adapter';
 import type { BookMetadata } from '@shared/book';
 
+type OpenLibraryText = string | { value?: string } | null | undefined;
+
+interface OpenLibraryDataBook {
+  title?: string;
+  authors?: Array<{ name: string }>;
+  cover?: { medium?: string };
+  publishers?: Array<{ name: string }>;
+  publish_date?: string;
+  number_of_pages?: number;
+}
+
+interface OpenLibraryEdition {
+  title?: string;
+  by_statement?: string;
+  authors?: Array<{ name?: string; key?: string }>;
+  covers?: number[];
+  description?: OpenLibraryText;
+  publishers?: string[];
+  publish_date?: string;
+  number_of_pages?: number;
+  works?: Array<{ key?: string }>;
+}
+
+interface OpenLibraryWork {
+  description?: OpenLibraryText;
+}
+
 /**
  * OpenLibraryAdapter (primary)
- * - Falls back to a curated mock dataset when network is unreachable
+ * - Falls back only to a curated mock dataset when network is unreachable
  *   (e.g. local dev without internet, or OPENLIBRARY_BASE mis-configured).
+ * - Unknown ISBNs return null so the Google Books fallback can resolve them.
  */
 @Injectable()
 export class OpenLibraryAdapter implements BookApiAdapter {
   readonly name = 'openlibrary';
   private readonly logger = new Logger(OpenLibraryAdapter.name);
-  private readonly http = axios.create({ timeout: 5000 });
+  private readonly http = axios.create({
+    timeout: 3000,
+    headers: { 'User-Agent': 'PodcastPlatform/1.0 (book metadata resolver)' },
+  });
   private cache = new Map<string, { data: BookMetadata; ts: number }>();
   private readonly cacheTtlMs = 5 * 60 * 1000;
+  private unavailableUntil = 0;
 
   constructor(private readonly config: ConfigService) {
-    axiosRetry(this.http, { retries: 2, retryDelay: axiosRetry.exponentialDelay });
+    axiosRetry(this.http, { retries: 0 });
   }
 
   async fetchByIsbn(isbn: string): Promise<BookMetadata | null> {
     const cached = this.cache.get(isbn);
     if (cached && Date.now() - cached.ts < this.cacheTtlMs) return cached.data;
+    if (Date.now() < this.unavailableUntil) return this.mockLookup(isbn);
 
     const base = this.config.get<string>('thirdParty.openLibrary.base');
     if (!base) return this.mockLookup(isbn);
@@ -32,27 +65,77 @@ export class OpenLibraryAdapter implements BookApiAdapter {
     try {
       const url = `${base}/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`;
       const resp = await this.http.get<Record<string, unknown>>(url);
-      const data = resp.data[`ISBN:${isbn}`] as
-        | { title?: string; authors?: Array<{ name: string }>; cover?: { medium?: string }; notes?: string; publishers?: Array<{ name: string }>; publish_date?: string; number_of_pages?: number }
-        | undefined;
-      if (!data) return this.mockLookup(isbn);
+      const data = resp.data[`ISBN:${isbn}`] as OpenLibraryDataBook | undefined;
+      if (!data) return null;
+      const edition = await this.fetchEdition(base, isbn);
+      const editionSummary = this.pickRealDescription(edition?.description);
+      const summary =
+        editionSummary ?? (edition?.works?.[0]?.key ? await this.fetchWorkSummary(base, edition.works[0].key) : null);
       const meta: BookMetadata = {
         isbn,
-        title: data.title ?? `Untitled (${isbn})`,
-        author: (data.authors ?? []).map((a) => a.name).join(', ') || 'Unknown',
-        coverUrl: data.cover?.medium ?? null,
-        summary: data.notes ?? null,
-        publisher: data.publishers?.[0]?.name ?? null,
-        publishedDate: data.publish_date ?? null,
-        pageCount: data.number_of_pages ?? null,
+        title: data.title ?? edition?.title ?? `Untitled (${isbn})`,
+        author: (data.authors ?? []).map((a) => a.name).join(', ') || edition?.by_statement || 'Unknown',
+        coverUrl: data.cover?.medium ?? this.coverFromEdition(edition) ?? null,
+        summary,
+        publisher: data.publishers?.[0]?.name ?? edition?.publishers?.[0] ?? null,
+        publishedDate: data.publish_date ?? edition?.publish_date ?? null,
+        pageCount: data.number_of_pages ?? edition?.number_of_pages ?? null,
         source: 'openlibrary',
       };
       this.cache.set(isbn, { data: meta, ts: Date.now() });
       return meta;
     } catch (e) {
+      if (axios.isAxiosError(e) && (e.code === 'ECONNABORTED' || !e.response)) {
+        this.unavailableUntil = Date.now() + 30_000;
+      }
       this.logger.warn(`OpenLibrary unreachable, falling back to mock: ${(e as Error).message}`);
       return this.mockLookup(isbn);
     }
+  }
+
+  private async fetchEdition(base: string, isbn: string): Promise<OpenLibraryEdition | null> {
+    try {
+      const resp = await this.http.get<OpenLibraryEdition>(`${base}/isbn/${isbn}.json`);
+      return resp.data;
+    } catch (e) {
+      this.logger.debug?.(`OpenLibrary edition details unavailable for ${isbn}: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
+  private async fetchWorkSummary(base: string, workKey: string): Promise<string | null> {
+    try {
+      const resp = await this.http.get<OpenLibraryWork>(`${base}${workKey}.json`);
+      return this.pickRealDescription(resp.data.description);
+    } catch (e) {
+      this.logger.debug?.(`OpenLibrary work details unavailable for ${workKey}: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
+  private pickRealDescription(value: OpenLibraryText): string | null {
+    const raw = typeof value === 'string' ? value : value?.value;
+    if (!raw) return null;
+
+    const cleaned = raw
+      .replace(/<[^>]+>/g, '')
+      .replace(/\[[^\]]+\]\([^)]+\)/g, '')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+--\s*(front|back)\s+(flap|cover)$/i, '')
+      .trim();
+
+    if (cleaned.length < 40) return null;
+    if (/^(u\.?s\.?|usa|can|uk|us)(\s*\/\s*(can|us|uk))*$/i.test(cleaned)) return null;
+    if (/^\d+\s*p\.\s*;?/i.test(cleaned)) return null;
+    if (/\bLexile\b/i.test(cleaned) && cleaned.length < 100) return null;
+    if (/^Includes\s+(bibliographical references|index)/i.test(cleaned)) return null;
+
+    return cleaned;
+  }
+
+  private coverFromEdition(edition: OpenLibraryEdition | null): string | null {
+    const coverId = edition?.covers?.[0];
+    return coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : null;
   }
 
   private mockLookup(isbn: string): BookMetadata | null {
@@ -113,13 +196,6 @@ export class OpenLibraryAdapter implements BookApiAdapter {
         source: 'mock',
       },
     ];
-    return mock.find((m) => m.isbn === isbn) ?? {
-      isbn,
-      title: `示例书 (${isbn})`,
-      author: 'Mock Author',
-      coverUrl: `https://placehold.co/200x200?text=${isbn.slice(-4)}`,
-      summary: '这是 OpenLibraryAdapter 在离线 / mock 模式下的占位数据。',
-      source: 'mock',
-    };
+    return mock.find((m) => m.isbn === isbn) ?? null;
   }
 }

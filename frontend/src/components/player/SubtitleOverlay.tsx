@@ -8,10 +8,16 @@ interface Props {
   currentMs: number;
   onSeek?: (ms: number) => void;
   fontSize?: number;
+  style?: {
+    fontSize?: number;
+    lineHeight?: number;
+  };
 }
 
-export function SubtitleOverlay({ segments, currentMs, onSeek, fontSize = 14 }: Props): JSX.Element {
+export function SubtitleOverlay({ segments, currentMs, onSeek, fontSize = 14, style }: Props): JSX.Element {
   const [activeIdx, setActiveIdx] = useState<number>(-1);
+  const resolvedFontSize = style?.fontSize ?? fontSize;
+  const resolvedLineHeight = style?.lineHeight ?? 1.6;
 
   useEffect(() => {
     const idx = segments.findIndex(
@@ -29,7 +35,7 @@ export function SubtitleOverlay({ segments, currentMs, onSeek, fontSize = 14 }: 
         bgcolor: 'rgba(0,0,0,0.04)',
         borderRadius: 1,
         p: 1,
-        lineHeight: 1.6,
+        lineHeight: resolvedLineHeight,
       }}
     >
       {segments.length === 0 ? (
@@ -48,7 +54,7 @@ export function SubtitleOverlay({ segments, currentMs, onSeek, fontSize = 14 }: 
                 borderRadius: 1,
                 bgcolor: isActive ? 'primary.light' : 'transparent',
                 color: isActive ? 'white' : 'text.primary',
-                fontSize,
+                fontSize: resolvedFontSize,
                 transition: 'all 0.15s',
                 fontWeight: isActive ? 600 : 400,
                 '&:hover': { bgcolor: isActive ? 'primary.light' : 'rgba(0,0,0,0.06)' },

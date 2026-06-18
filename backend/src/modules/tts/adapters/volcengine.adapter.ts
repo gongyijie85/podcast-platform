@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { TtsAdapter } from './tts.adapter';
 import type { TtsPreviewResult, TtsVoice } from '@shared/book';
+import { synthesizeMockSilence } from './mock-audio.util';
 
 /**
  * Volcengine TTS adapter (primary).
@@ -37,40 +38,12 @@ export class VolcengineAdapter implements TtsAdapter {
     if (!hasKey) {
       this.logger.warn(`VOLC_TTS_* missing → mock mode (Mock 模式 - 实际部署需配置 AppID+Token). voice=${voiceId}`);
     }
-    // Estimate duration: 4.5 chars/sec for Chinese
-    const chars = Array.from(text || ' ').length;
-    const durationMs = Math.max(1000, Math.round((chars / 4.5) * 1000));
-    const buffer = await this.synthesizeMock(durationMs);
-    return { buffer, durationMs };
+    return synthesizeMockSilence(text);
   }
 
   async preview(text: string, voiceId: string): Promise<TtsPreviewResult> {
     const { buffer, durationMs } = await this.synthesize(text, voiceId);
     return { url: this.bufferToDataUrl(buffer), durationMs, format: 'mp3' };
-  }
-
-  private async synthesizeMock(durationMs: number): Promise<Buffer> {
-    // Generate silent MP3 by stitching zero-padded frames via ffmpeg lavfi.
-    const { default: ffmpeg } = await import('fluent-ffmpeg');
-    return new Promise<Buffer>((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      const stream = require('node:stream');
-      const passthrough = new stream.PassThrough();
-      passthrough.on('data', (c: Buffer) => chunks.push(c));
-      passthrough.on('end', () => resolve(Buffer.concat(chunks)));
-      passthrough.on('error', (e: Error) => reject(e));
-      const cmd = ffmpeg()
-        .input('anullsrc=channel_layout=mono:sample_rate=22050')
-        .inputFormat('lavfi')
-        .audioCodec('libmp3lame')
-        .audioBitrate('64k')
-        .audioChannels(1)
-        .audioFrequency(22050)
-        .duration(durationMs / 1000)
-        .format('mp3')
-        .on('error', (err: Error) => reject(err))
-        .stream(passthrough);
-    });
   }
 
   private bufferToDataUrl(buf: Buffer): string {

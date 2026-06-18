@@ -1,0 +1,477 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useProjectStore } from '../store/project.store';
+
+const mocks = vi.hoisted(() => ({
+  fetchMetadata: vi.fn(),
+  resolveMetadata: vi.fn(),
+  listLibrary: vi.fn(),
+  importBookRank: vi.fn(),
+  createProject: vi.fn(),
+  generateProject: vi.fn(),
+  regenerateProject: vi.fn(),
+  getProject: vi.fn(),
+  createShare: vi.fn(),
+  getScript: vi.fn(),
+  saveScript: vi.fn(),
+  listBgm: vi.fn(),
+  listVoices: vi.fn(),
+  useProgress: vi.fn(),
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) =>
+      ({
+        'bookSearch.title': '图书搜索',
+        'bookSearch.noResults': '没有结果',
+        'book.fetching': '正在抓取',
+        'projectCreate.title': '新建项目',
+        'projectCreate.segmentMode': '分段模式',
+        'projectCreate.scriptMode': '脚本模式',
+        'common.next': '下一步',
+        'common.prev': '上一步',
+        'common.startGenerate': '开始生成',
+        'config.on': '开启',
+        'config.off': '关闭',
+      })[key] ?? key,
+  }),
+}));
+
+vi.mock('../components/book/BookSearchBar', () => ({
+  BookSearchBar: ({ onSearch }: { onSearch: (isbns: string[]) => void }) => {
+    const makeIsbn = (index: number): string => {
+      const body = `978000000${String(index).padStart(3, '0')}`;
+      const sum = body
+        .split('')
+        .reduce((acc, digit, i) => acc + Number(digit) * (i % 2 === 0 ? 1 : 3), 0);
+      return `${body}${(10 - (sum % 10)) % 10}`;
+    };
+
+    return (
+      <button type="button" onClick={() => onSearch(Array.from({ length: 20 }, (_, i) => makeIsbn(i)))}>
+        mock search
+      </button>
+    );
+  },
+}));
+
+vi.mock('../components/script/SixSegmentView', () => ({
+  SixSegmentView: ({ onChange }: { onChange: (items: unknown[]) => void }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onChange([
+          {
+            id: 'seg-1',
+            speaker: 'host',
+            stage: 'intro',
+            text: '欢迎收听本期节目',
+            emotion: '平缓',
+          },
+        ])
+      }
+    >
+      fill segment
+    </button>
+  ),
+}));
+
+vi.mock('../components/tts/VoiceSelector', () => ({
+  VoiceSelector: () => <div>voice selector</div>,
+}));
+
+vi.mock('../components/bgm/BGMPicker', () => ({
+  BGMPicker: () => <div>bgm picker</div>,
+}));
+
+vi.mock('../hooks/useProgress', () => ({
+  useProgress: () => mocks.useProgress(),
+}));
+
+vi.mock('../api/book.api', () => ({
+  bookApi: {
+    fetchMetadata: mocks.fetchMetadata,
+    resolveMetadata: mocks.resolveMetadata,
+    listLibrary: mocks.listLibrary,
+    importBookRank: mocks.importBookRank,
+  },
+}));
+
+vi.mock('../api/project.api', () => ({
+  projectApi: {
+    create: mocks.createProject,
+    generate: mocks.generateProject,
+    regenerate: mocks.regenerateProject,
+    get: mocks.getProject,
+    createShare: mocks.createShare,
+  },
+}));
+
+vi.mock('../api/script.api', () => ({
+  scriptApi: {
+    get: mocks.getScript,
+    save: mocks.saveScript,
+  },
+}));
+
+vi.mock('../api/bgm.api', () => ({
+  bgmApi: {
+    list: mocks.listBgm,
+  },
+}));
+
+vi.mock('../api/tts.api', () => ({
+  ttsApi: {
+    listVoices: mocks.listVoices,
+  },
+}));
+
+import { BookSearch } from '../pages/BookSearch';
+import { ProjectCreate } from '../pages/ProjectCreate';
+import { ProjectDetail } from '../pages/ProjectDetail';
+
+function LocationProbe(): JSX.Element {
+  const location = useLocation();
+  return <div>target search: {location.search}</div>;
+}
+
+const createdProject = {
+  id: 'project-1',
+  title: '测试项目',
+  status: 'draft',
+  progress: 0,
+  currentStage: null,
+};
+
+const resolvedBook = {
+  isbn: '9780241662151',
+  title: 'The Creative Act: A Way of Being',
+  author: 'Rick Rubin',
+  coverUrl: null,
+  summary: 'A book about creativity as a way of life.',
+  podcastAngle: '适合从创作习惯与灵感来源切入。',
+  publisher: 'Canongate',
+  publishedDate: '2023',
+  source: 'googlebooks' as const,
+};
+
+describe('page experience improvements', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useProjectStore.getState().reset();
+    mocks.useProgress.mockReturnValue({ progress: 0, stage: null, message: '', events: [] });
+    mocks.listBgm.mockResolvedValue([]);
+    mocks.listVoices.mockResolvedValue([]);
+    mocks.createProject.mockResolvedValue(createdProject);
+    mocks.generateProject.mockResolvedValue({ accepted: true, jobIds: {} });
+    mocks.regenerateProject.mockResolvedValue({ accepted: true, jobIds: {}, project: createdProject });
+    mocks.getProject.mockResolvedValue(createdProject);
+    mocks.createShare.mockResolvedValue({ token: 'share-token', projectId: 'project-1', url: '/share/share-token', expiresAt: '2026-06-25T00:00:00.000Z' });
+    mocks.getScript.mockResolvedValue(null);
+    mocks.saveScript.mockResolvedValue({});
+    mocks.resolveMetadata.mockResolvedValue({ items: [], failed: [] });
+    mocks.listLibrary.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 10 });
+    mocks.importBookRank.mockResolvedValue({ imported: 0, items: [] });
+  });
+
+  it('shows a metadata error without creating local fallback books', async () => {
+    mocks.resolveMetadata.mockRejectedValue(new Error('metadata timeout'));
+    render(<BookSearch />, { wrapper: MemoryRouter });
+
+    fireEvent.click(screen.getByRole('button', { name: 'mock search' }));
+
+    expect(await screen.findByText(/图书信息获取失败：metadata timeout/)).toBeInTheDocument();
+    expect(screen.queryByText(/示例书名/)).not.toBeInTheDocument();
+  });
+
+  it('shows 20 organized books across 10-item pages with real summary details', async () => {
+    mocks.resolveMetadata.mockResolvedValue({
+      items: Array.from({ length: 20 }, (_, i) => ({
+        isbn: `97871213622${String(i).padStart(2, '0')}`,
+        title: `测试书 ${i + 1}`,
+        author: `作者 ${i + 1}`,
+        coverUrl: null,
+        summary: `简介 ${i + 1}`,
+        podcastAngle: `播客切入点 ${i + 1}`,
+        source: i % 2 === 0 ? 'openlibrary' : 'mock',
+      })),
+      failed: [{ isbn: '9787121362299', reason: 'metadata_not_found' }],
+    });
+    render(<BookSearch />, { wrapper: MemoryRouter });
+
+    fireEvent.click(screen.getByRole('button', { name: 'mock search' }));
+
+    expect(await screen.findByText(/本次搜索 · 共 20 本/)).toBeInTheDocument();
+    expect(screen.getByText('测试书 1')).toBeInTheDocument();
+    expect(screen.getByText('作者 1')).toBeInTheDocument();
+    expect(screen.getByText('简介 1')).toBeInTheDocument();
+    expect(screen.queryByText('播客切入点 1')).not.toBeInTheDocument();
+    expect(screen.getAllByText('来源：Open Library')[0]).toBeInTheDocument();
+    expect(screen.getByText(/未获取到 1 本书/)).toBeInTheDocument();
+    expect(screen.queryByText('测试书 11')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /go to page 2/i }));
+
+    expect(await screen.findByText('测试书 11')).toBeInTheDocument();
+    expect(screen.queryByText('测试书 1')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '清空结果' }));
+
+    expect(screen.getByText('输入 ISBN 开始整理')).toBeInTheDocument();
+    expect(screen.queryByText('测试书 11')).not.toBeInTheDocument();
+  });
+
+  it('shows the shared book library and imports BookRank books', async () => {
+    mocks.listLibrary
+      .mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 10 })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 'lib-1',
+            isbn: '9780063511637',
+            title: 'WHISTLER',
+            author: 'Ann Patchett',
+            coverUrl: null,
+            summary: '中文长简介。',
+            source: 'bookrank',
+            category: 'hardcover-fiction',
+            categoryName: '精装小说',
+            rank: 1,
+            queryCount: 1,
+            firstSeenAt: '2026-06-18T00:00:00.000Z',
+            lastSeenAt: '2026-06-18T00:00:00.000Z',
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 10,
+      });
+    mocks.importBookRank.mockResolvedValueOnce({ imported: 1, items: [] });
+
+    render(<BookSearch />, { wrapper: MemoryRouter });
+
+    expect(await screen.findByText('陈列库暂无图书')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /导入到陈列库/ }));
+
+    expect(await screen.findByText('WHISTLER')).toBeInTheDocument();
+    expect(screen.getByText('Ann Patchett')).toBeInTheDocument();
+    expect(screen.getByText('中文长简介。')).toBeInTheDocument();
+    expect(screen.getAllByText('BookRank').length).toBeGreaterThan(0);
+    expect(mocks.importBookRank).toHaveBeenCalledWith({
+      kind: 'bestsellers',
+      category: 'hardcover-fiction',
+      limit: 20,
+    });
+  });
+
+  it('lets users pick multiple books from the organizer before creating a podcast', async () => {
+    mocks.resolveMetadata.mockResolvedValue({
+      items: Array.from({ length: 3 }, (_, i) => ({
+        isbn: `97871213622${String(i).padStart(2, '0')}`,
+        title: `测试书 ${i + 1}`,
+        author: `作者 ${i + 1}`,
+        coverUrl: null,
+        summary: `简介 ${i + 1}`,
+        source: 'openlibrary',
+      })),
+      failed: [],
+    });
+    render(
+      <MemoryRouter initialEntries={['/book-search']}>
+        <Routes>
+          <Route path="/book-search" element={<BookSearch />} />
+          <Route path="/projects/new" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'mock search' }));
+
+    expect(await screen.findByText(/本次搜索 · 共 3 本/)).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('选择 测试书 1'));
+    fireEvent.click(screen.getByLabelText('选择 测试书 2'));
+
+    expect(screen.getByText(/已选 2 本，用于确定本期播客内容/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '用选中书籍创建播客' }));
+
+    expect(await screen.findByText(/target search:/)).toHaveTextContent(
+      'target search: ?bookId=9787121362200&bookId=9787121362201',
+    );
+  });
+
+  it('creates and starts generation from resolved book metadata without a manual script', async () => {
+    mocks.resolveMetadata.mockResolvedValueOnce({ items: [resolvedBook], failed: [] });
+    render(
+      <MemoryRouter initialEntries={['/projects/new?bookId=978-0241662151&title=The+Creative+Act&author=Rick+Rubin']}>
+        <ProjectCreate />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('The Creative Act: A Way of Being')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    expect(await screen.findByText('专业导读')).toBeInTheDocument();
+    expect(screen.getByText('默认六段式')).toBeInTheDocument();
+    expect(screen.getByText('AI 深潜播客')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '开始生成' })[0]);
+
+    await waitFor(() => expect(mocks.createProject).toHaveBeenCalled());
+    expect(mocks.createProject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isbns: ['9780241662151'],
+        books: [expect.objectContaining({ title: resolvedBook.title, podcastAngle: resolvedBook.podcastAngle })],
+        scriptTemplate: 'audio-overview',
+        voices: [
+          { role: 'host', voiceId: '白桦', provider: 'xiaomi' },
+          { role: 'guest', voiceId: '茉莉', provider: 'xiaomi' },
+        ],
+      }),
+    );
+    expect(mocks.saveScript).not.toHaveBeenCalled();
+    expect(mocks.generateProject).toHaveBeenCalledWith('project-1', { scriptTemplate: 'audio-overview' });
+  });
+
+  it('shows episode brief, quality report, and quick revision controls on project detail', async () => {
+    const detailProject = {
+      id: 'project-1',
+      title: '两本书的 AI 深潜播客',
+      status: 'done',
+      progress: 100,
+      currentStage: null,
+      mode: 'merged',
+      scriptTemplate: 'audio-overview',
+      createdAt: '2026-06-18T00:00:00.000Z',
+      updatedAt: '2026-06-18T00:00:00.000Z',
+      books: [
+        {
+          id: 'book-1',
+          projectId: 'project-1',
+          isbn: '9780593804216',
+          title: 'YESTERYEAR',
+          author: 'Stephen King',
+          coverUrl: null,
+          summary: '中文简介一。',
+          metadataSource: 'bookrank',
+          orderIndex: 0,
+        },
+        {
+          id: 'book-2',
+          projectId: 'project-1',
+          isbn: '9780063511637',
+          title: 'WHISTLER',
+          author: 'Ann Patchett',
+          coverUrl: null,
+          summary: '中文简介二。',
+          metadataSource: 'bookrank',
+          orderIndex: 1,
+        },
+      ],
+      voices: [],
+      bgmConfigs: [],
+    };
+    mocks.getProject.mockResolvedValue(detailProject);
+    mocks.regenerateProject.mockResolvedValue({ accepted: true, jobIds: {}, project: detailProject });
+    mocks.getScript.mockResolvedValue({
+      id: 'script-1',
+      projectId: 'project-1',
+      version: 1,
+      content: '{}',
+      rawText: '脚本文本',
+      wordCount: 4,
+      segments: [],
+      episodeBrief: {
+        episodeQuestion: '两本新书如何讨论人与时代的关系？',
+        openingPromise: '听众会理解它们为什么值得放在一起。',
+        bookRoles: [
+          { title: 'YESTERYEAR', role: '提供时间和记忆的入口。' },
+          { title: 'WHISTLER', role: '提供关系和修复的入口。' },
+        ],
+        crossBookAngles: ['记忆与关系', '个人处境与时代压力'],
+        listenerTakeaways: ['带着问题阅读。'],
+        sourceLimits: ['不要虚构奖项或销量。'],
+      },
+      qualityReport: {
+        status: 'warning',
+        warnings: ['多书节目缺少明确的跨书比较。'],
+        bookCoverage: [
+          { title: 'YESTERYEAR', mentionCount: 2, mentioned: true, hasSubstantiveLine: true, summaryAvailable: true },
+          { title: 'WHISTLER', mentionCount: 1, mentioned: true, hasSubstantiveLine: false, summaryAvailable: true },
+        ],
+        hasCrossBookComparison: false,
+        fillerPhraseCount: 1,
+        titleIntegrityWarnings: [],
+        groundednessWarnings: [],
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/projects/project-1']}>
+        <Routes>
+          <Route path="/projects/:id" element={<ProjectDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('两本书的 AI 深潜播客')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /脚本/ }));
+
+    expect(await screen.findByText('节目策划')).toBeInTheDocument();
+    expect(screen.getByText('两本新书如何讨论人与时代的关系？')).toBeInTheDocument();
+    expect(screen.getByText('质量自检')).toBeInTheDocument();
+    expect(screen.getByText('多书节目缺少明确的跨书比较。')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '少口头禅' }));
+
+    await waitFor(() => expect(mocks.regenerateProject).toHaveBeenCalledWith('project-1', {
+      scriptTemplate: 'audio-overview',
+      revisionPreset: 'less-filler',
+      customInstruction: undefined,
+    }));
+  });
+
+  it('defaults to merged mode when multiple books are loaded from the organizer', async () => {
+    mocks.resolveMetadata.mockResolvedValueOnce({
+      items: [
+        resolvedBook,
+        {
+          isbn: '9780743273565',
+          title: 'The Great Gatsby',
+          author: 'F. Scott Fitzgerald',
+          coverUrl: null,
+          summary: 'A Jazz Age novel about wealth, desire, illusion, and social class.',
+          source: 'openlibrary' as const,
+        },
+      ],
+      failed: [],
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/projects/new?bookId=9780061120084&bookId=9780743273565']}>
+        <ProjectCreate />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('The Creative Act: A Way of Being')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '合并为单期' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('shows a specific error when pipeline startup fails', async () => {
+    mocks.resolveMetadata.mockResolvedValueOnce({ items: [resolvedBook], failed: [] });
+    mocks.generateProject.mockRejectedValue(new Error('queue offline'));
+    render(
+      <MemoryRouter initialEntries={['/projects/new?bookId=9780241662151&title=The+Creative+Act&author=Rick+Rubin']}>
+        <ProjectCreate />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '开始生成' })[0]);
+
+    expect(await screen.findByText(/queue offline/)).toBeInTheDocument();
+  });
+});

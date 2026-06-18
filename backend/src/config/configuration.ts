@@ -20,7 +20,7 @@ export const configuration = () => ({
     password: process.env.REDIS_PASSWORD || undefined,
   },
   storage: {
-    driver: (process.env.STORAGE_DRIVER || 'minio') as 'minio' | 'oss',
+    driver: (process.env.STORAGE_DRIVER || 'minio') as 'minio' | 'oss' | 'local',
     minio: {
       endpoint: process.env.MINIO_ENDPOINT || 'localhost',
       port: parseInt(process.env.MINIO_PORT || '9000', 10),
@@ -38,6 +38,14 @@ export const configuration = () => ({
     },
   },
   thirdParty: {
+    llm: {
+      provider: process.env.LLM_PROVIDER || 'mimo',
+      apiKey: process.env.LLM_API_KEY || process.env.DOUBAO_API_KEY || '',
+      endpoint: process.env.LLM_ENDPOINT || process.env.DOUBAO_ENDPOINT || 'https://token-plan-sgp.xiaomimimo.com/v1',
+      model: process.env.LLM_MODEL || process.env.DOUBAO_MODEL || 'mimo-v2.5-pro',
+      maxCompletionTokens: parseInt(process.env.LLM_MAX_COMPLETION_TOKENS || '4096', 10),
+      topP: parseFloat(process.env.LLM_TOP_P || '0.9'),
+    },
     doubao: {
       apiKey: process.env.DOUBAO_API_KEY || '',
       endpoint: process.env.DOUBAO_ENDPOINT || 'https://ark.cn-beijing.volces.com/api/v3',
@@ -48,6 +56,12 @@ export const configuration = () => ({
       token: process.env.VOLC_TTS_TOKEN || '',
       cluster: process.env.VOLC_TTS_CLUSTER || 'volcano_tts',
     },
+    mimoTts: {
+      apiKey: process.env.MIMO_TTS_API_KEY || process.env.LLM_API_KEY || '',
+      endpoint: process.env.MIMO_TTS_ENDPOINT || process.env.LLM_ENDPOINT || 'https://token-plan-sgp.xiaomimimo.com/v1',
+      model: process.env.MIMO_TTS_MODEL || 'mimo-v2.5-tts',
+      format: process.env.MIMO_TTS_FORMAT || 'wav',
+    },
     azureTts: {
       key: process.env.AZURE_TTS_KEY || '',
       region: process.env.AZURE_TTS_REGION || 'eastasia',
@@ -57,6 +71,10 @@ export const configuration = () => ({
     },
     googleBooks: {
       base: process.env.GOOGLE_BOOKS_BASE || 'https://www.googleapis.com/books/v1',
+      apiKey: process.env.GOOGLE_API_KEY || '',
+    },
+    bookRank: {
+      base: process.env.BOOKRANK_API_BASE_URL || 'https://bookrank-ckml.onrender.com',
     },
   },
   limits: {

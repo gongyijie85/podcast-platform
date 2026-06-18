@@ -6,7 +6,7 @@
   "nav": {
     "home": "Home",
     "dashboard": "Dashboard",
-    "book": "① Books",
+    "book": "Book organizer",
     "config": "② Config",
     "generating": "③ Generate",
     "preview": "④ Preview & Export",

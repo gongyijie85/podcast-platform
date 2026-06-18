@@ -11,6 +11,7 @@ const Projects = lazy(() => import('../pages/Projects').then((m) => ({ default: 
 const BookSearch = lazy(() => import('../pages/BookSearch').then((m) => ({ default: m.BookSearch })));
 const ProjectCreate = lazy(() => import('../pages/ProjectCreate').then((m) => ({ default: m.ProjectCreate })));
 const ProjectDetail = lazy(() => import('../pages/ProjectDetail').then((m) => ({ default: m.ProjectDetail })));
+const SharePreview = lazy(() => import('../pages/SharePreview').then((m) => ({ default: m.SharePreview })));
 const Settings = lazy(() => import('../pages/Settings').then((m) => ({ default: m.Settings })));
 const NotFound = lazy(() => import('../pages/NotFound').then((m) => ({ default: m.NotFound })));
 
@@ -37,6 +38,7 @@ export const AppRoutes = (): JSX.Element => (
       </Route>
 
       <Route path="/404" element={<NotFound />} />
+      <Route path="/share/:token" element={<SharePreview />} />
       <Route path="*" element={<Navigate to="/404" replace />} />
     </Routes>
   </Suspense>

@@ -20,6 +20,7 @@ import { useAuthStore } from '../store/auth.store';
 import { useUiStore } from '../store/ui.store';
 import { Input } from '../components/common/Input';
 import { Button } from '../components/common/Button';
+import { isValidEmail, isValidNicknameLength, isValidPasswordLength } from '../utils/validation';
 
 export function Register(): JSX.Element {
   const { t } = useTranslation();
@@ -37,11 +38,21 @@ export function Register(): JSX.Element {
   const onSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     setErr(null);
-    if (!email || !password || !nickname) {
+    const normalizedEmail = email.trim();
+    const normalizedNickname = nickname.trim();
+    if (!normalizedEmail || !password || !normalizedNickname) {
       setErr('请完整填写信息');
       return;
     }
-    if (password.length < 6) {
+    if (!isValidEmail(normalizedEmail)) {
+      setErr('请输入有效邮箱地址');
+      return;
+    }
+    if (!isValidNicknameLength(normalizedNickname)) {
+      setErr('昵称长度需为 2-30 个字符');
+      return;
+    }
+    if (!isValidPasswordLength(password)) {
       setErr('密码至少 6 位');
       return;
     }
@@ -50,7 +61,7 @@ export function Register(): JSX.Element {
       return;
     }
     try {
-      await register(email, password, nickname);
+      await register(normalizedEmail, password, normalizedNickname);
       push(t('auth.success'), 'success');
       navigate('/dashboard', { replace: true });
     } catch (e) {
@@ -156,7 +167,7 @@ export function Register(): JSX.Element {
           }}
         />
 
-        <Button type="submit" variant="contained" size="large" loading={loading} disabled={!email || !password || !nickname}>
+        <Button type="submit" variant="contained" size="large" loading={loading} disabled={!email.trim() || !password || !nickname.trim()}>
           {t('auth.submitRegister')}
         </Button>
 

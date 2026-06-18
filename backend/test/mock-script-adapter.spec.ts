@@ -35,13 +35,14 @@ describe('MockScriptGenAdapter (TP2)', () => {
     books: [makeBook()],
     mode: 'independent',
     template: 'standard',
+    scriptTemplate: 'default',
     title: '人类简史',
     ...overrides,
   });
 
   it('case 1 — legal input returns 12 segments across 6 stages with valid emotions', async () => {
     const adapter = new MockScriptGenAdapter();
-    const segs = await adapter.generateScript(makeCtx());
+    const { segments: segs } = await adapter.generateScript(makeCtx());
     expect(Array.isArray(segs)).toBe(true);
     expect(segs.length).toBe(12);
 
@@ -73,7 +74,7 @@ describe('MockScriptGenAdapter (TP2)', () => {
   it('case 3 — simulated network delay is bounded under a 1s deadline', async () => {
     const adapter = new MockScriptGenAdapter();
     const start = Date.now();
-    const segs = await adapter.generateScript(makeCtx());
+    const { segments: segs } = await adapter.generateScript(makeCtx());
     const elapsed = Date.now() - start;
     expect(segs.length).toBe(12);
     // Bounded by the 50..200ms simulated delay + scheduler overhead.
@@ -82,7 +83,7 @@ describe('MockScriptGenAdapter (TP2)', () => {
 
   it('case 4 — template switch ("merge") still returns 12 segments from the default template', async () => {
     const adapter = new MockScriptGenAdapter();
-    const segs = await adapter.generateScript(makeCtx({ template: 'merge', mode: 'merged' }));
+    const { segments: segs } = await adapter.generateScript(makeCtx({ template: 'merge', mode: 'merged' }));
     expect(segs.length).toBe(12);
     // The first segment is the `opening` stage in the fixture; v1.0 maps it to `intro`.
     expect(segs[0].stage).toBe('intro');

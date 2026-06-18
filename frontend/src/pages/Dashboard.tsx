@@ -62,8 +62,15 @@ export function Dashboard(): JSX.Element {
   const [activeProject, setActiveProject] = useState<ProjectDto | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ProjectDto | null>(null);
 
-  // Backend doesn't expose DELETE /projects yet; the API would 404. Use get/list.
-  const { data, loading, error, refetch } = useApi(() => projectApi.list(1, 50), []);
+  // Guests can start a project without loading authenticated history.
+  const { data, loading, error, refetch } = useApi(
+    () => (
+      user
+        ? projectApi.list(1, 50)
+        : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 50 })
+    ),
+    [user?.id],
+  );
 
   useEffect(() => {
     if (error) push(`加载项目失败: ${error.message}`, 'error');

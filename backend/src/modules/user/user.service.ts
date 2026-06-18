@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ErrorCode } from '@shared/api';
-import type { UserDto } from '@shared/user';
+import type { UserDto, UserPreferencesDto } from '@shared/user';
 
 @Injectable()
 export class UserService {
@@ -36,5 +36,25 @@ export class UserService {
       where: { userId_key: { userId, key } },
     });
     return (pref?.value as T) ?? null;
+  }
+
+  async getPreferences(userId: string): Promise<UserPreferencesDto> {
+    return (await this.getPreference<UserPreferencesDto>(userId, 'preferences')) ?? {};
+  }
+
+  async patchPreferences(userId: string, patch: UserPreferencesDto): Promise<UserPreferencesDto> {
+    const current = await this.getPreferences(userId);
+    const next: UserPreferencesDto = {
+      ...current,
+      ...patch,
+      subtitleStyle: {
+        ...(current.subtitleStyle ?? { fontSize: 16, lineHeight: 1.6 }),
+        ...(patch.subtitleStyle ?? {}),
+      },
+      recentVoiceIds: patch.recentVoiceIds ?? current.recentVoiceIds,
+      recentBgmTrackIds: patch.recentBgmTrackIds ?? current.recentBgmTrackIds,
+    };
+    await this.setPreference(userId, 'preferences', next);
+    return next;
   }
 }

@@ -84,13 +84,19 @@ export class FfmpegUtil {
     if (opts.bgm) await fs.promises.writeFile(bgmFile, opts.bgm);
 
     try {
+      const voiceDurationSec = await FfmpegUtil.probeDurationSec(voiceFile).catch(() => 0);
+      const fadeOutStart = Math.max(0, voiceDurationSec - fadeOut);
       return await FfmpegUtil.run((cmd) => {
         cmd.input(voiceFile);
-        if (opts.bgm) cmd.input(bgmFile);
+        if (opts.bgm) {
+          cmd.input(bgmFile).inputOptions(['-stream_loop', '-1']);
+        }
         const filters: string[] = [];
         filters.push(`[0:a]volume=${v.toFixed(3)}[v0]`);
         if (opts.bgm) {
-          filters.push(`[1:a]volume=${b.toFixed(3)},afade=in:st=0:d=${fadeIn},afade=out:st=0:d=${fadeOut}[b0]`);
+          filters.push(
+            `[1:a]volume=${b.toFixed(3)},afade=t=in:st=0:d=${fadeIn},afade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeOut}[b0]`,
+          );
           filters.push(`[v0][b0]amix=inputs=2:duration=first:dropout_transition=0[ab]`);
         } else {
           filters.push(`[v0]anull[ab]`);
@@ -104,5 +110,19 @@ export class FfmpegUtil {
       await fs.promises.unlink(voiceFile).catch(() => undefined);
       if (opts.bgm) await fs.promises.unlink(bgmFile).catch(() => undefined);
     }
+  }
+
+  private static async probeDurationSec(file: string): Promise<number> {
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v',
+      'error',
+      '-show_entries',
+      'format=duration',
+      '-of',
+      'default=noprint_wrappers=1:nokey=1',
+      file,
+    ]);
+    const value = Number.parseFloat(stdout.trim());
+    return Number.isFinite(value) ? value : 0;
   }
 }

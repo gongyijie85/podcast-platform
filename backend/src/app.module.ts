@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
+import * as path from 'node:path';
 
 import { configuration } from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
@@ -49,6 +50,12 @@ function tryResolvePinoPrettyTarget():
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: [
+        path.resolve(process.cwd(), '.env.local'),
+        path.resolve(process.cwd(), '.env'),
+        path.resolve(process.cwd(), '..', '.env.local'),
+        path.resolve(process.cwd(), '..', '.env'),
+      ],
       load: [configuration],
     }),
     LoggerModule.forRootAsync({
