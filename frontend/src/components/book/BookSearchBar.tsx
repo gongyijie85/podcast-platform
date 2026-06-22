@@ -14,6 +14,7 @@ interface Props {
   onSearch?: (isbns: string[]) => void;
   placeholder?: string;
   autoSearch?: boolean;
+  maxIsbns?: number;
 }
 
 /**
@@ -27,6 +28,7 @@ export function BookSearchBar({
   onSearch,
   placeholder,
   autoSearch = false,
+  maxIsbns,
 }: Props): JSX.Element {
   const { t } = useTranslation();
   const [raw, setRaw] = useState(value);
@@ -36,6 +38,7 @@ export function BookSearchBar({
   const parsed = parseIsbnInput(debounced);
   const valid = parsed.filter((p) => p.valid);
   const invalid = parsed.filter((p) => !p.valid);
+  const overLimit = typeof maxIsbns === 'number' && valid.length > maxIsbns;
 
   const update = useCallback(
     (next: string): void => {
@@ -109,14 +112,24 @@ export function BookSearchBar({
         <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1, flexWrap: 'wrap', gap: 1 }}>
           <Typography variant="caption" color="text.secondary">
             {parsed.length === 0
-              ? t('common.search')
-              : `${t('common.search')} · ${valid.length} ${t('book.title')}`}
+              ? maxIsbns
+                ? `可批量粘贴 ISBN，最多处理前 ${maxIsbns} 个有效 ISBN`
+                : t('common.search')
+              : `${valid.length} 个有效 ISBN${maxIsbns ? ` · 最多处理前 ${maxIsbns} 个` : ''}`}
           </Typography>
           {valid.length > 0 && (
             <Chip label={`✓ ${valid.length}`} size="small" color="success" variant="outlined" />
           )}
           {invalid.length > 0 && (
             <Chip label={`✗ ${invalid.length}`} size="small" color="error" variant="outlined" />
+          )}
+          {overLimit && (
+            <Chip
+              label={`将忽略 ${valid.length - (maxIsbns ?? valid.length)} 个`}
+              size="small"
+              color="warning"
+              variant="outlined"
+            />
           )}
         </Stack>
 

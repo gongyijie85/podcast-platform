@@ -31,6 +31,8 @@ import type { BookLibraryItem, BookMetadata, BookRankImportPayload } from '@shar
 
 const PAGE_SIZE = 10;
 const LIBRARY_MAX_ATTEMPTS = 2;
+const LIBRARY_IMPORT_MAX_ISBNS = 200;
+const RESOLVE_BATCH_SIZE = 20;
 
 const BOOKRANK_CATEGORIES = [
   { value: 'hardcover-fiction', label: '精装小说' },
@@ -65,6 +67,35 @@ const isTransientLibraryError = (error: unknown): boolean => {
   );
 };
 
+const chunk = <T,>(items: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+};
+
+const normalizeUniqueIsbns = (
+  isbns: string[],
+): { normalized: string[]; duplicateCount: number; overflowCount: number } => {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const isbn of isbns) {
+    const value = normalizeIsbn(isbn) ?? isbn.replace(/[-\s]/g, '').trim();
+    if (!value) continue;
+    if (seen.has(value)) continue;
+    seen.add(value);
+    normalized.push(value);
+  }
+
+  return {
+    normalized: normalized.slice(0, LIBRARY_IMPORT_MAX_ISBNS),
+    duplicateCount: isbns.length - normalized.length,
+    overflowCount: Math.max(0, normalized.length - LIBRARY_IMPORT_MAX_ISBNS),
+  };
+};
+
 interface BookOrganizerProps {
   initialIsbns?: string[];
   onUseBook: (book: BookMetadata) => void;
@@ -95,6 +126,8 @@ export function BookOrganizer({
   const [results, setResults] = useState<BookMetadata[]>([]);
   const [failed, setFailed] = useState<Array<{ isbn: string; reason: string }>>([]);
   const [loading, setLoading] = useState(false);
+  const [searchLoadingLabel, setSearchLoadingLabel] = useState('正在整理图书信息');
+  const [searchNotice, setSearchNotice] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchPage, setSearchPage] = useState(1);
@@ -199,14 +232,17 @@ export function BookOrganizer({
   const libraryTotalPages = Math.max(1, Math.ceil(libraryTotal / PAGE_SIZE));
 
   const handleSearch = async (isbns: string[]): Promise<void> => {
-    const normalized = isbns
-      .map((isbn) => normalizeIsbn(isbn) ?? isbn.trim())
-      .filter(Boolean)
-      .slice(0, 20);
+    const { normalized, duplicateCount, overflowCount } = normalizeUniqueIsbns(isbns);
 
     if (normalized.length === 0) return;
 
     setLoading(true);
+    setSearchLoadingLabel(
+      normalized.length > RESOLVE_BATCH_SIZE
+        ? `准备分批整理 ${normalized.length} 本书`
+        : '正在整理图书信息',
+    );
+    setSearchNotice(null);
     setSearched(true);
     setError(null);
     setFailed([]);
@@ -215,15 +251,46 @@ export function BookOrganizer({
     setView('search');
 
     try {
-      const response = await bookApi.resolveMetadata(normalized);
-      setResults(response.items);
-      setFailed(response.failed);
+      const batches = chunk(normalized, RESOLVE_BATCH_SIZE);
+      const aggregatedItems = new Map<string, BookMetadata>();
+      const aggregatedFailed: Array<{ isbn: string; reason: string }> = [];
+
+      for (let index = 0; index < batches.length; index += 1) {
+        const batch = batches[index];
+        const processedBefore = index * RESOLVE_BATCH_SIZE;
+        setSearchLoadingLabel(
+          batches.length === 1
+            ? '正在整理图书信息'
+            : `正在整理第 ${index + 1}/${batches.length} 批 · ${processedBefore}/${normalized.length} 本`,
+        );
+
+        const response = await bookApi.resolveMetadata(batch);
+        for (const item of response.items) {
+          aggregatedItems.set(item.isbn, item);
+        }
+        aggregatedFailed.push(...response.failed);
+
+        setResults(Array.from(aggregatedItems.values()));
+        setFailed([...aggregatedFailed]);
+      }
+
+      const items = Array.from(aggregatedItems.values());
+      setResults(items);
+      setFailed(aggregatedFailed);
       void loadLibrary(1);
 
-      if (response.items.length === 0) {
+      const notices = [
+        duplicateCount > 0 ? `已自动去重 ${duplicateCount} 个重复 ISBN` : null,
+        overflowCount > 0
+          ? `本次最多导入 ${LIBRARY_IMPORT_MAX_ISBNS} 本，已忽略 ${overflowCount} 个超出项`
+          : null,
+      ].filter(Boolean);
+      setSearchNotice(notices.length > 0 ? notices.join('；') : null);
+
+      if (items.length === 0) {
         push(t('bookSearch.noResults'), 'info');
       } else {
-        push(`已整理 ${response.items.length} 本书，并写入图书陈列库`, 'success');
+        push(`已整理 ${items.length} 本书，并写入图书陈列库`, 'success');
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : '未知错误';
@@ -232,6 +299,7 @@ export function BookOrganizer({
       push('图书信息获取失败', 'error');
     } finally {
       setLoading(false);
+      setSearchLoadingLabel('正在整理图书信息');
     }
   };
 
@@ -261,6 +329,7 @@ export function BookOrganizer({
     setResults([]);
     setFailed([]);
     setError(null);
+    setSearchNotice(null);
     setSearched(false);
     setSearchPage(1);
     setFilterText('');
@@ -634,7 +703,10 @@ export function BookOrganizer({
               <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1 }}>
                 批量 ISBN 搜索
               </Typography>
-              <BookSearchBar onSearch={(isbns) => void handleSearch(isbns)} />
+              <BookSearchBar
+                maxIsbns={LIBRARY_IMPORT_MAX_ISBNS}
+                onSearch={(isbns) => void handleSearch(isbns)}
+              />
             </Box>
           </Stack>
         </Paper>
@@ -642,6 +714,12 @@ export function BookOrganizer({
         {libraryNotice && (
           <Alert severity="info" onClose={() => setLibraryNotice(null)}>
             {libraryNotice}
+          </Alert>
+        )}
+
+        {searchNotice && (
+          <Alert severity="info" onClose={() => setSearchNotice(null)}>
+            {searchNotice}
           </Alert>
         )}
 
@@ -718,7 +796,7 @@ export function BookOrganizer({
               </Stack>
             )
           ) : loading ? (
-            <Loading fullScreen label={t('book.fetching')} />
+            <Loading fullScreen label={searchLoadingLabel || t('book.fetching')} />
           ) : results.length === 0 && searched ? (
             <Empty
               title={t('bookSearch.noResults')}
@@ -727,7 +805,7 @@ export function BookOrganizer({
           ) : results.length === 0 ? (
             <Empty
               title="输入 ISBN 开始整理"
-              description="可一次粘贴最多 20 个 ISBN；成功解析后会写入图书陈列库"
+              description="可一次粘贴最多 200 个 ISBN；系统会按 20 本一批整理并写入图书陈列库"
             />
           ) : (
             <Stack spacing={2}>

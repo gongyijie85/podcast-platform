@@ -398,7 +398,7 @@ export function ProjectCreate(): JSX.Element {
               <Typography variant="h6" fontWeight={600} gutterBottom>
                 选书
               </Typography>
-              <BookSearchBar onSearch={(isbns) => void resolveBooks(isbns)} />
+              <BookSearchBar maxIsbns={20} onSearch={(isbns) => void resolveBooks(isbns)} />
             </Box>
 
             {resolving ? (

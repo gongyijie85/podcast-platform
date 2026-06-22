@@ -40,7 +40,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../components/book/BookSearchBar', () => ({
-  BookSearchBar: ({ onSearch }: { onSearch: (isbns: string[]) => void }) => {
+  BookSearchBar: ({ onSearch, maxIsbns }: { onSearch: (isbns: string[]) => void; maxIsbns?: number }) => {
     const makeIsbn = (index: number): string => {
       const body = `978000000${String(index).padStart(3, '0')}`;
       const sum = body
@@ -50,9 +50,15 @@ vi.mock('../components/book/BookSearchBar', () => ({
     };
 
     return (
-      <button type="button" onClick={() => onSearch(Array.from({ length: 20 }, (_, i) => makeIsbn(i)))}>
-        mock search
-      </button>
+      <div>
+        <button type="button" onClick={() => onSearch(Array.from({ length: 20 }, (_, i) => makeIsbn(i)))}>
+          mock search
+        </button>
+        <button type="button" onClick={() => onSearch(Array.from({ length: 45 }, (_, i) => makeIsbn(i)))}>
+          mock bulk search
+        </button>
+        <span>mock max isbns: {maxIsbns ?? 'none'}</span>
+      </div>
     );
   },
 }));
@@ -221,6 +227,31 @@ describe('page experience improvements', () => {
 
     expect(screen.getByText('输入 ISBN 开始整理')).toBeInTheDocument();
     expect(screen.queryByText('测试书 11')).not.toBeInTheDocument();
+  });
+
+  it('imports large ISBN batches in 20-book chunks for the shared library', async () => {
+    mocks.resolveMetadata.mockImplementation(async (isbns: string[]) => ({
+      items: isbns.map((isbn, i) => ({
+        isbn,
+        title: `批量书 ${isbn}`,
+        author: `批量作者 ${i + 1}`,
+        coverUrl: null,
+        summary: `真实简介 ${isbn}`,
+        source: 'openlibrary' as const,
+      })),
+      failed: [],
+    }));
+
+    render(<BookSearch />, { wrapper: MemoryRouter });
+
+    fireEvent.click(screen.getByRole('button', { name: 'mock bulk search' }));
+
+    expect(await screen.findByText(/本次搜索 · 共 45 本/)).toBeInTheDocument();
+    expect(mocks.resolveMetadata).toHaveBeenCalledTimes(3);
+    expect(mocks.resolveMetadata.mock.calls.map(([isbns]) => isbns.length)).toEqual([20, 20, 5]);
+    expect(mocks.resolveMetadata.mock.calls.every(([isbns]) => isbns.length <= 20)).toBe(true);
+    expect(screen.getByText('批量书 9780000000002')).toBeInTheDocument();
+    expect(screen.getByText('真实简介 9780000000002')).toBeInTheDocument();
   });
 
   it('shows the shared book library and imports BookRank books', async () => {
