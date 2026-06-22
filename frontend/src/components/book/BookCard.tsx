@@ -1,4 +1,17 @@
-import { Card, CardContent, CardActions, Typography, Button, Stack, Avatar, Box, Chip, IconButton, Tooltip, Checkbox } from '@mui/material';
+import {
+  Card,
+  CardContent,
+  CardActions,
+  Typography,
+  Button,
+  Stack,
+  Avatar,
+  Box,
+  Chip,
+  IconButton,
+  Tooltip,
+  Checkbox,
+} from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
@@ -41,7 +54,8 @@ export function BookCard({
   const isList = layout === 'list';
   const highlighted = selected || checked;
   const rank = 'rank' in book && typeof book.rank === 'number' ? book.rank : null;
-  const categoryName = 'categoryName' in book && typeof book.categoryName === 'string' ? book.categoryName : null;
+  const categoryName =
+    'categoryName' in book && typeof book.categoryName === 'string' ? book.categoryName : null;
 
   return (
     <Card
@@ -54,8 +68,16 @@ export function BookCard({
         borderWidth: highlighted ? 2 : 1,
         borderRadius: 1,
         overflow: 'hidden',
-        transition: 'border-color 0.15s, box-shadow 0.15s, transform 0.15s',
-        '&:hover': { boxShadow: 2, borderColor: highlighted ? 'primary.main' : 'primary.light' },
+        bgcolor: highlighted ? 'rgba(99, 102, 241, 0.045)' : 'background.paper',
+        boxShadow: highlighted
+          ? '0 12px 28px rgba(79, 70, 229, 0.10)'
+          : '0 1px 2px rgba(15, 23, 42, 0.04)',
+        transition: 'border-color 0.15s, box-shadow 0.15s, transform 0.15s, background-color 0.15s',
+        '&:hover': {
+          boxShadow: '0 16px 36px rgba(15, 23, 42, 0.10)',
+          borderColor: highlighted ? 'primary.main' : 'primary.light',
+          transform: 'translateY(-1px)',
+        },
       }}
     >
       <CardContent
@@ -71,7 +93,12 @@ export function BookCard({
               checked={checked}
               onChange={() => onToggleSelect?.(book)}
               inputProps={{ 'aria-label': `选择 ${book.title}` }}
-              sx={{ mt: -1, ml: -1, flexShrink: 0 }}
+              sx={{
+                mt: -1,
+                ml: -1,
+                flexShrink: 0,
+                '& .MuiSvgIcon-root': { fontSize: 22 },
+              }}
             />
           )}
           <Box sx={{ position: 'relative', flexShrink: 0 }}>
@@ -81,8 +108,12 @@ export function BookCard({
               sx={{
                 width: isList ? 76 : 64,
                 height: isList ? 108 : 88,
-                bgcolor: 'primary.light',
+                bgcolor: '#eef2ff',
+                color: 'primary.main',
                 borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'divider',
+                boxShadow: '0 10px 24px rgba(15, 23, 42, 0.12)',
               }}
             >
               <MenuBookIcon />
@@ -98,8 +129,8 @@ export function BookCard({
                   height: 26,
                   px: 0.75,
                   borderRadius: 1,
-                  bgcolor: 'primary.main',
-                  color: 'primary.contrastText',
+                  bgcolor: '#111827',
+                  color: '#ffffff',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -116,21 +147,44 @@ export function BookCard({
             <Typography
               variant={isList ? 'h6' : 'subtitle1'}
               fontWeight={700}
-              sx={{ lineHeight: 1.25, fontSize: isList ? { xs: 16, md: 18 } : undefined }}
+              sx={{
+                lineHeight: 1.25,
+                fontSize: isList ? { xs: 16, md: 18 } : undefined,
+                letterSpacing: 0,
+              }}
               title={book.title}
             >
               {book.title}
             </Typography>
-            <Typography variant="body2" color="text.secondary" title={book.author} sx={{ mt: 0.25 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              title={book.author}
+              sx={{ mt: 0.25, fontWeight: 600 }}
+            >
               {book.author}
             </Typography>
             <Stack direction="row" spacing={0.5} sx={{ mt: 1, flexWrap: 'wrap', gap: 0.5 }}>
-              <Chip size="small" label={book.isbn} variant="outlined" />
-              {rank && <Chip size="small" label={`榜单 #${rank}`} color="primary" variant="outlined" />}
+              <Chip
+                size="small"
+                label={book.isbn}
+                variant="outlined"
+                sx={{ fontFamily: 'monospace' }}
+              />
+              {rank && (
+                <Chip size="small" label={`榜单 #${rank}`} color="primary" variant="filled" />
+              )}
               {categoryName && <Chip size="small" label={categoryName} variant="outlined" />}
               {book.publisher && <Chip size="small" label={book.publisher} variant="outlined" />}
-              {book.publishedDate && <Chip size="small" label={book.publishedDate} variant="outlined" />}
-              <Chip size="small" label={SOURCE_LABELS[book.source].replace('来源：', '')} variant="outlined" />
+              {book.publishedDate && (
+                <Chip size="small" label={book.publishedDate} variant="outlined" />
+              )}
+              <Chip
+                size="small"
+                label={SOURCE_LABELS[book.source].replace('来源：', '')}
+                variant="outlined"
+                sx={{ bgcolor: 'background.default' }}
+              />
             </Stack>
             {book.summary ? (
               <Typography
@@ -138,17 +192,21 @@ export function BookCard({
                 color="text.secondary"
                 sx={{
                   display: '-webkit-box',
-                  WebkitLineClamp: isList ? 4 : 3,
+                  WebkitLineClamp: isList ? 5 : 3,
                   WebkitBoxOrient: 'vertical',
                   overflow: 'hidden',
                   mt: 1,
-                  lineHeight: 1.7,
+                  lineHeight: 1.75,
                 }}
               >
                 {book.summary}
               </Typography>
             ) : (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontStyle: 'italic' }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 1, fontStyle: 'italic' }}
+              >
                 暂无简介信息
               </Typography>
             )}
@@ -165,7 +223,9 @@ export function BookCard({
           flexDirection: isList ? { xs: 'row', sm: 'column' } : 'row',
           borderLeft: isList ? { sm: '1px solid' } : undefined,
           borderColor: 'divider',
-          bgcolor: isList ? { sm: 'background.default' } : undefined,
+          bgcolor: isList
+            ? { sm: highlighted ? 'rgba(99, 102, 241, 0.06)' : '#f8fafc' }
+            : undefined,
         }}
       >
         <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
@@ -195,7 +255,7 @@ export function BookCard({
               size="small"
               variant={selected ? 'outlined' : 'contained'}
               onClick={() => onUse(book)}
-              sx={{ whiteSpace: 'nowrap' }}
+              sx={{ whiteSpace: 'nowrap', minWidth: 88 }}
             >
               {selected ? '已选' : '使用此书'}
             </Button>

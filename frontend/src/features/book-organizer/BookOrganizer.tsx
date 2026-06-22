@@ -71,7 +71,11 @@ interface BookOrganizerProps {
   onUseBooks?: (books: BookMetadata[]) => void;
 }
 
-export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: BookOrganizerProps): JSX.Element {
+export function BookOrganizer({
+  initialIsbns = [],
+  onUseBook,
+  onUseBooks,
+}: BookOrganizerProps): JSX.Element {
   const { t } = useTranslation();
   const push = useUiStore((s) => s.push);
   const [view, setView] = useState<ViewMode>('library');
@@ -112,7 +116,9 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
       setLibraryNotice(null);
       try {
         for (let attempt = 1; attempt <= LIBRARY_MAX_ATTEMPTS; attempt += 1) {
-          setLibraryLoadingLabel(attempt === 1 ? '正在加载图书陈列库' : '后端冷启动中，正在重试图书陈列库');
+          setLibraryLoadingLabel(
+            attempt === 1 ? '正在加载图书陈列库' : '后端冷启动中，正在重试图书陈列库',
+          );
           try {
             const response = await bookApi.listLibrary({
               page,
@@ -304,9 +310,15 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
   const libraryEnd = Math.min(libraryPage * PAGE_SIZE, libraryTotal);
   const searchStart = filteredResults.length === 0 ? 0 : (searchPage - 1) * PAGE_SIZE + 1;
   const searchEnd = Math.min(searchPage * PAGE_SIZE, filteredResults.length);
+  const metrics = [
+    { label: '陈列', value: libraryTotal, icon: <LibraryBooksIcon fontSize="small" /> },
+    { label: '本次搜索', value: results.length, icon: <AutoStoriesIcon fontSize="small" /> },
+    { label: '已选', value: selectedList.length, icon: <PlaylistAddCheckIcon fontSize="small" /> },
+    { label: '失败', value: failed.length, icon: <ReportProblemOutlinedIcon fontSize="small" /> },
+  ];
 
   return (
-    <Box sx={{ maxWidth: 1180, mx: 'auto' }}>
+    <Box sx={{ maxWidth: 1220, mx: 'auto' }}>
       <Stack spacing={2.5}>
         <Paper
           variant="outlined"
@@ -315,46 +327,101 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
             borderRadius: 1,
             position: 'relative',
             overflow: 'hidden',
+            bgcolor: '#ffffff',
+            borderColor: 'rgba(99, 102, 241, 0.18)',
+            boxShadow: '0 16px 46px rgba(15, 23, 42, 0.06)',
             '&::before': {
               content: '""',
               position: 'absolute',
               top: 0,
               left: 0,
-              right: 0,
-              height: 4,
+              bottom: 0,
+              width: 5,
               bgcolor: 'primary.main',
             },
           }}
         >
           <Stack spacing={2}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
-              <Box>
+            <Stack
+              direction={{ xs: 'column', lg: 'row' }}
+              spacing={2.5}
+              justifyContent="space-between"
+            >
+              <Box sx={{ minWidth: 0, maxWidth: 620 }}>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                  <AutoStoriesIcon color="primary" />
-                  <Typography variant="h4" fontWeight={800} sx={{ fontSize: { xs: 24, md: 30 } }}>
+                  <Box
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 1,
+                      display: 'grid',
+                      placeItems: 'center',
+                      bgcolor: '#eef2ff',
+                      color: 'primary.main',
+                    }}
+                  >
+                    <AutoStoriesIcon fontSize="small" />
+                  </Box>
+                  <Typography
+                    variant="h4"
+                    fontWeight={800}
+                    sx={{ fontSize: { xs: 24, md: 30 }, letterSpacing: 0 }}
+                  >
                     图书陈列库
                   </Typography>
                 </Stack>
                 <Typography color="text.secondary">
-                  全站共享书库：沉淀历史查询、项目用书和 BookRank 导入图书，每页 10 本，可批量勾选生成播客。
+                  历史查询、BookRank 导入和项目用书汇总到这里，先选书，再进入播客生成。
                 </Typography>
               </Box>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-                <Chip icon={<LibraryBooksIcon />} label={`陈列 ${libraryTotal}`} variant="outlined" />
-                <Chip label={`本次搜索 ${results.length}`} variant="outlined" />
-                <Chip
-                  icon={<PlaylistAddCheckIcon />}
-                  label={`已选 ${selectedList.length}`}
-                  color={selectedList.length > 0 ? 'primary' : 'default'}
-                  variant="outlined"
-                />
-                <Chip
-                  icon={<ReportProblemOutlinedIcon />}
-                  label={`失败 ${failed.length}`}
-                  color={failed.length > 0 ? 'warning' : 'default'}
-                  variant="outlined"
-                />
-              </Stack>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: 'repeat(2, minmax(0, 1fr))',
+                    sm: 'repeat(4, minmax(92px, 1fr))',
+                  },
+                  gap: 1,
+                  minWidth: { lg: 440 },
+                }}
+              >
+                {metrics.map((item) => {
+                  const active = item.label === '已选' && selectedList.length > 0;
+                  const warning = item.label === '失败' && failed.length > 0;
+                  return (
+                    <Box
+                      key={item.label}
+                      sx={{
+                        p: 1.25,
+                        border: 1,
+                        borderColor: active ? 'primary.main' : warning ? 'warning.main' : 'divider',
+                        borderRadius: 1,
+                        bgcolor: active
+                          ? 'rgba(99, 102, 241, 0.08)'
+                          : warning
+                            ? 'rgba(245, 158, 11, 0.08)'
+                            : '#f8fafc',
+                        minHeight: 74,
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={0.75}
+                        color="text.secondary"
+                      >
+                        {item.icon}
+                        <Typography variant="caption" fontWeight={700}>
+                          {item.label}
+                        </Typography>
+                      </Stack>
+                      <Typography variant="h5" fontWeight={800} sx={{ mt: 0.25, letterSpacing: 0 }}>
+                        {item.value}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
             </Stack>
 
             <ToggleButtonGroup
@@ -363,6 +430,21 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
               value={view}
               onChange={(_, value) => value && setView(value)}
               aria-label="book organizer view"
+              sx={{
+                alignSelf: 'flex-start',
+                p: 0.5,
+                bgcolor: '#f1f5f9',
+                borderRadius: 1,
+                '& .MuiToggleButton-root': {
+                  border: 0,
+                  borderRadius: 1,
+                  px: 2,
+                  '&.Mui-selected': {
+                    bgcolor: 'background.paper',
+                    boxShadow: '0 2px 8px rgba(15, 23, 42, 0.10)',
+                  },
+                },
+              }}
             >
               <ToggleButton value="library">公共陈列库</ToggleButton>
               <ToggleButton value="search">本次 ISBN 搜索</ToggleButton>
@@ -372,125 +454,189 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
 
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 1 }}>
           <Stack spacing={2}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ md: 'center' }}>
-              <TextField
-                size="small"
-                value={librarySearchText}
-                onChange={(event) => setLibrarySearchText(event.target.value)}
-                placeholder="筛选书名、作者、ISBN、简介"
-                inputProps={{ 'aria-label': 'filter library books' }}
-                InputProps={{ startAdornment: <SearchIcon fontSize="small" color="action" sx={{ mr: 1 }} /> }}
-                sx={{ flex: 1 }}
-              />
-              <TextField
-                select
-                size="small"
-                label="来源"
-                value={librarySource}
-                onChange={(event) => setLibrarySource(event.target.value)}
-                SelectProps={{ native: true }}
-                sx={{ minWidth: 150 }}
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.25fr) minmax(360px, 0.75fr)' },
+                gap: 2,
+                alignItems: 'stretch',
+              }}
+            >
+              <Box
+                sx={{
+                  p: 1.5,
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  bgcolor: '#fbfdff',
+                }}
               >
-                <option value="">全部来源</option>
-                <option value="bookrank">BookRank</option>
-                <option value="openlibrary">Open Library</option>
-                <option value="googlebooks">Google Books</option>
-                <option value="mock">Mock</option>
-              </TextField>
-              <TextField
-                select
-                size="small"
-                label="分类"
-                value={libraryCategory}
-                onChange={(event) => setLibraryCategory(event.target.value)}
-                SelectProps={{ native: true }}
-                sx={{ minWidth: 170 }}
+                <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1.25 }}>
+                  筛选陈列
+                </Typography>
+                <Stack
+                  direction={{ xs: 'column', md: 'row' }}
+                  spacing={1.25}
+                  alignItems={{ md: 'center' }}
+                >
+                  <TextField
+                    size="small"
+                    value={librarySearchText}
+                    onChange={(event) => setLibrarySearchText(event.target.value)}
+                    placeholder="书名、作者、ISBN、简介"
+                    inputProps={{ 'aria-label': 'filter library books' }}
+                    InputProps={{
+                      startAdornment: <SearchIcon fontSize="small" color="action" sx={{ mr: 1 }} />,
+                    }}
+                    sx={{ flex: 1 }}
+                  />
+                  <TextField
+                    select
+                    size="small"
+                    label="来源"
+                    value={librarySource}
+                    onChange={(event) => setLibrarySource(event.target.value)}
+                    SelectProps={{ native: true }}
+                    sx={{ minWidth: 140 }}
+                  >
+                    <option value="">全部来源</option>
+                    <option value="bookrank">BookRank</option>
+                    <option value="openlibrary">Open Library</option>
+                    <option value="googlebooks">Google Books</option>
+                    <option value="mock">Mock</option>
+                  </TextField>
+                  <TextField
+                    select
+                    size="small"
+                    label="分类"
+                    value={libraryCategory}
+                    onChange={(event) => setLibraryCategory(event.target.value)}
+                    SelectProps={{ native: true }}
+                    sx={{ minWidth: 160 }}
+                  >
+                    <option value="">全部分类</option>
+                    <option value="new-books">新书</option>
+                    {BOOKRANK_CATEGORIES.map((category) => (
+                      <option key={category.value} value={category.value}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </TextField>
+                  <Button
+                    startIcon={<SearchIcon />}
+                    variant="contained"
+                    onClick={applyLibraryFilters}
+                    sx={{ whiteSpace: 'nowrap' }}
+                  >
+                    筛选
+                  </Button>
+                  <Button onClick={clearLibraryFilters} sx={{ whiteSpace: 'nowrap' }}>
+                    清空
+                  </Button>
+                  <Button
+                    startIcon={<RefreshIcon />}
+                    onClick={() => void loadLibrary()}
+                    sx={{ whiteSpace: 'nowrap' }}
+                  >
+                    刷新
+                  </Button>
+                </Stack>
+              </Box>
+
+              <Box
+                sx={{
+                  p: 1.5,
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  bgcolor: '#f8fafc',
+                }}
               >
-                <option value="">全部分类</option>
-                <option value="new-books">新书</option>
-                {BOOKRANK_CATEGORIES.map((category) => (
-                  <option key={category.value} value={category.value}>
-                    {category.label}
-                  </option>
-                ))}
-              </TextField>
-              <Button variant="contained" onClick={applyLibraryFilters} sx={{ whiteSpace: 'nowrap' }}>
-                筛选
-              </Button>
-              <Button onClick={clearLibraryFilters} sx={{ whiteSpace: 'nowrap' }}>
-                清空
-              </Button>
-              <Button startIcon={<RefreshIcon />} onClick={() => void loadLibrary()} sx={{ whiteSpace: 'nowrap' }}>
-                刷新
-              </Button>
-            </Stack>
+                <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1.25 }}>
+                  BookRank 导入
+                </Typography>
+                <Stack direction={{ xs: 'column', md: 'row', lg: 'column' }} spacing={1.25}>
+                  <Stack direction={{ xs: 'column', sm: 'row', lg: 'column' }} spacing={1.25}>
+                    <TextField
+                      select
+                      size="small"
+                      label="导入类型"
+                      value={importKind}
+                      onChange={(event) =>
+                        setImportKind(event.target.value as BookRankImportPayload['kind'])
+                      }
+                      SelectProps={{ native: true }}
+                      sx={{ minWidth: 150 }}
+                    >
+                      <option value="bestsellers">畅销榜</option>
+                      <option value="new-books">新书</option>
+                    </TextField>
+                    {importKind === 'bestsellers' && (
+                      <TextField
+                        select
+                        size="small"
+                        label="榜单分类"
+                        value={importCategory}
+                        onChange={(event) => setImportCategory(event.target.value)}
+                        SelectProps={{ native: true }}
+                        sx={{ minWidth: 190 }}
+                      >
+                        {BOOKRANK_CATEGORIES.map((category) => (
+                          <option key={category.value} value={category.value}>
+                            {category.label}
+                          </option>
+                        ))}
+                      </TextField>
+                    )}
+                    <TextField
+                      select
+                      size="small"
+                      label="数量"
+                      value={importLimit}
+                      onChange={(event) => setImportLimit(Number(event.target.value))}
+                      SelectProps={{ native: true }}
+                      sx={{ minWidth: 110 }}
+                    >
+                      {[10, 20, 30, 50].map((value) => (
+                        <option key={value} value={value}>
+                          {value} 本
+                        </option>
+                      ))}
+                    </TextField>
+                  </Stack>
+                  <Button
+                    variant="contained"
+                    startIcon={<LibraryBooksIcon />}
+                    onClick={() => void importFromBookRank()}
+                    disabled={importing}
+                    sx={{
+                      whiteSpace: 'nowrap',
+                      alignSelf: { xs: 'stretch', md: 'flex-start', lg: 'stretch' },
+                    }}
+                  >
+                    {importing ? '导入中' : '导入到陈列库'}
+                  </Button>
+                </Stack>
+              </Box>
+            </Box>
 
             <Divider />
 
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ md: 'center' }}>
-              <Chip icon={<LibraryBooksIcon />} label="BookRank 导入" variant="outlined" sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }} />
-              <TextField
-                select
-                size="small"
-                label="导入类型"
-                value={importKind}
-                onChange={(event) => setImportKind(event.target.value as BookRankImportPayload['kind'])}
-                SelectProps={{ native: true }}
-                sx={{ minWidth: 150 }}
-              >
-                <option value="bestsellers">畅销榜</option>
-                <option value="new-books">新书</option>
-              </TextField>
-              {importKind === 'bestsellers' && (
-                <TextField
-                  select
-                  size="small"
-                  label="榜单分类"
-                  value={importCategory}
-                  onChange={(event) => setImportCategory(event.target.value)}
-                  SelectProps={{ native: true }}
-                  sx={{ minWidth: 190 }}
-                >
-                  {BOOKRANK_CATEGORIES.map((category) => (
-                    <option key={category.value} value={category.value}>
-                      {category.label}
-                    </option>
-                  ))}
-                </TextField>
-              )}
-              <TextField
-                select
-                size="small"
-                label="数量"
-                value={importLimit}
-                onChange={(event) => setImportLimit(Number(event.target.value))}
-                SelectProps={{ native: true }}
-                sx={{ minWidth: 110 }}
-              >
-                {[10, 20, 30, 50].map((value) => (
-                  <option key={value} value={value}>
-                    {value} 本
-                  </option>
-                ))}
-              </TextField>
-              <Button
-                variant="contained"
-                startIcon={<LibraryBooksIcon />}
-                onClick={() => void importFromBookRank()}
-                disabled={importing}
-                sx={{ whiteSpace: 'nowrap' }}
-              >
-                {importing ? '导入中' : '导入到陈列库'}
-              </Button>
-            </Stack>
+            <Box
+              sx={{
+                p: 1.5,
+                border: 1,
+                borderColor: 'divider',
+                borderRadius: 1,
+                bgcolor: 'background.paper',
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1 }}>
+                批量 ISBN 搜索
+              </Typography>
+              <BookSearchBar onSearch={(isbns) => void handleSearch(isbns)} />
+            </Box>
           </Stack>
-        </Paper>
-
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 1 }}>
-          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-            批量 ISBN 搜索
-          </Typography>
-          <BookSearchBar onSearch={(isbns) => void handleSearch(isbns)} />
         </Paper>
 
         {libraryNotice && (
@@ -500,7 +646,13 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
         )}
 
         {(error || libraryError) && (
-          <Alert severity="error" onClose={() => { setError(null); setLibraryError(null); }}>
+          <Alert
+            severity="error"
+            onClose={() => {
+              setError(null);
+              setLibraryError(null);
+            }}
+          >
             {error || libraryError}
           </Alert>
         )}
@@ -516,10 +668,18 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
             libraryLoading ? (
               <Loading fullScreen label={libraryLoadingLabel} />
             ) : libraryItems.length === 0 ? (
-              <Empty title="陈列库暂无图书" description="可以先批量搜索 ISBN，或从 BookRank 导入畅销榜图书" />
+              <Empty
+                title="陈列库暂无图书"
+                description="可以先批量搜索 ISBN，或从 BookRank 导入畅销榜图书"
+              />
             ) : (
               <Stack spacing={2}>
-                <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ md: 'center' }} justifyContent="space-between" spacing={1.5}>
+                <Stack
+                  direction={{ xs: 'column', md: 'row' }}
+                  alignItems={{ md: 'center' }}
+                  justifyContent="space-between"
+                  spacing={1.5}
+                >
                   <Box>
                     <Typography variant="h6" fontWeight={700}>
                       公共陈列库 · 共 {libraryTotal} 本 · 第 {libraryPage}/{libraryTotalPages} 页
@@ -560,31 +720,52 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
           ) : loading ? (
             <Loading fullScreen label={t('book.fetching')} />
           ) : results.length === 0 && searched ? (
-            <Empty title={t('bookSearch.noResults')} description="请检查 ISBN，或稍后重试图书信息服务" />
+            <Empty
+              title={t('bookSearch.noResults')}
+              description="请检查 ISBN，或稍后重试图书信息服务"
+            />
           ) : results.length === 0 ? (
-            <Empty title="输入 ISBN 开始整理" description="可一次粘贴最多 20 个 ISBN；成功解析后会写入图书陈列库" />
+            <Empty
+              title="输入 ISBN 开始整理"
+              description="可一次粘贴最多 20 个 ISBN；成功解析后会写入图书陈列库"
+            />
           ) : (
             <Stack spacing={2}>
-              <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ md: 'center' }} justifyContent="space-between" spacing={1.5}>
+              <Stack
+                direction={{ xs: 'column', md: 'row' }}
+                alignItems={{ md: 'center' }}
+                justifyContent="space-between"
+                spacing={1.5}
+              >
                 <Box>
                   <Typography variant="h6" fontWeight={700}>
                     本次搜索 · 共 {results.length} 本
-                    {filteredResults.length !== results.length ? ` · 匹配 ${filteredResults.length} 本` : ''}
-                    {filteredResults.length > PAGE_SIZE ? ` · 第 ${searchPage}/${searchTotalPages} 页` : ''}
+                    {filteredResults.length !== results.length
+                      ? ` · 匹配 ${filteredResults.length} 本`
+                      : ''}
+                    {filteredResults.length > PAGE_SIZE
+                      ? ` · 第 ${searchPage}/${searchTotalPages} 页`
+                      : ''}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     当前显示 {searchStart}-{searchEnd}，卡片包含书名、作者和真实图书简介。
                   </Typography>
                 </Box>
 
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1}
+                  alignItems={{ sm: 'center' }}
+                >
                   <TextField
                     size="small"
                     value={filterText}
                     onChange={(event) => setFilterText(event.target.value)}
                     placeholder="在本次结果中筛选"
                     inputProps={{ 'aria-label': 'filter books' }}
-                    InputProps={{ startAdornment: <SearchIcon fontSize="small" color="action" sx={{ mr: 1 }} /> }}
+                    InputProps={{
+                      startAdornment: <SearchIcon fontSize="small" color="action" sx={{ mr: 1 }} />,
+                    }}
                     sx={{ minWidth: { xs: '100%', sm: 260 } }}
                   />
                   <Button size="small" onClick={clearResults} sx={{ whiteSpace: 'nowrap' }}>
@@ -651,10 +832,19 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
           已选 {selectedList.length} 本，用于确定本期播客内容。
         </Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-          <Button size="small" variant="outlined" onClick={toggleVisibleSelection} disabled={activeItems.length === 0}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={toggleVisibleSelection}
+            disabled={activeItems.length === 0}
+          >
             {allVisibleSelected ? '取消本页' : '选中本页'}
           </Button>
-          <Button size="small" onClick={() => setSelectedBooks(new Map())} disabled={selectedList.length === 0}>
+          <Button
+            size="small"
+            onClick={() => setSelectedBooks(new Map())}
+            disabled={selectedList.length === 0}
+          >
             清空选择
           </Button>
           <Button
