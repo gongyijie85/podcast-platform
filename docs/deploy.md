@@ -57,6 +57,8 @@ git push origin main
 
 1. 进 Vercel 项目 → **Settings → Environment Variables**
 2. 把 `VITE_API_BASE_URL` 的值改成 Render 给的 URL，例如 `https://podcast-platform-backend.onrender.com`
+   - `VITE_WS_URL` = `wss://<你的后端>.onrender.com`
+   - `VITE_API_TIMEOUT_MS` = `90000`（Render Free 冷启动时给首个 API 请求更长等待窗口）
 3. 切到 **Deployments** → 选最新一次 → **Redeploy**（env 改了必须重新构建才能生效）
 4. 完成后访问 `https://<你的>.vercel.app`，F12 console 应看到 `/api/health` 调用 200
 

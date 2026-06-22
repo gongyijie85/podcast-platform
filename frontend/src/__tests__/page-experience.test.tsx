@@ -266,6 +266,41 @@ describe('page experience improvements', () => {
     });
   });
 
+  it('retries the shared book library when the backend is waking up', async () => {
+    mocks.listLibrary.mockReset();
+    mocks.listLibrary
+      .mockRejectedValueOnce(new Error('timeout of 90000ms exceeded'))
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 'lib-cold-start',
+            isbn: '9780063511637',
+            title: 'WHISTLER',
+            author: 'Ann Patchett',
+            coverUrl: null,
+            summary: '中文长简介。',
+            source: 'bookrank',
+            category: 'hardcover-fiction',
+            categoryName: '精装小说',
+            rank: 1,
+            queryCount: 1,
+            firstSeenAt: '2026-06-18T00:00:00.000Z',
+            lastSeenAt: '2026-06-18T00:00:00.000Z',
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 10,
+      });
+
+    render(<BookSearch />, { wrapper: MemoryRouter });
+
+    expect(await screen.findByText('WHISTLER')).toBeInTheDocument();
+    expect(screen.getByText('后端服务已唤醒，图书陈列库已恢复。')).toBeInTheDocument();
+    expect(screen.queryByText(/图书陈列库加载失败/)).not.toBeInTheDocument();
+    expect(mocks.listLibrary).toHaveBeenCalledTimes(2);
+  });
+
   it('lets users pick multiple books from the organizer before creating a podcast', async () => {
     mocks.resolveMetadata.mockResolvedValue({
       items: Array.from({ length: 3 }, (_, i) => ({

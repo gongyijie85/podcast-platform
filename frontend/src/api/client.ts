@@ -27,12 +27,18 @@ const traceId = (): string => {
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: ENV.apiBaseUrl,
-  timeout: 30_000,
+  timeout: ENV.apiTimeoutMs,
 });
 
 axiosRetry(apiClient, {
-  retries: 3,
-  retryDelay: axiosRetry.exponentialDelay,
+  retries: 2,
+  shouldResetTimeout: true,
+  retryDelay: (retryCount, err) => {
+    if (axios.isAxiosError(err) && (err.code === 'ECONNABORTED' || !err.response)) {
+      return retryCount * 2_000;
+    }
+    return axiosRetry.exponentialDelay(retryCount, err);
+  },
   retryCondition: (err) => {
     if (axios.isAxiosError(err)) {
       const s = err.response?.status ?? 0;

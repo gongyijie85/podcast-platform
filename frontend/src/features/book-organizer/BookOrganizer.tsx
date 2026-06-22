@@ -30,6 +30,7 @@ import { normalizeIsbn } from '../../utils/isbn';
 import type { BookLibraryItem, BookMetadata, BookRankImportPayload } from '@shared/book';
 
 const PAGE_SIZE = 10;
+const LIBRARY_MAX_ATTEMPTS = 2;
 
 const BOOKRANK_CATEGORIES = [
   { value: 'hardcover-fiction', label: '精装小说' },
@@ -41,6 +42,28 @@ const BOOKRANK_CATEGORIES = [
 ];
 
 type ViewMode = 'library' | 'search';
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return '未知错误';
+};
+
+const isTransientLibraryError = (error: unknown): boolean => {
+  const message = getErrorMessage(error).toLowerCase();
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error
+      ? String((error as { code?: unknown }).code ?? '').toLowerCase()
+      : '';
+  return (
+    code === 'econnaborted' ||
+    message.includes('timeout') ||
+    message.includes('network error') ||
+    message.includes('connection') ||
+    message.includes('fetch failed') ||
+    message.includes('application loading')
+  );
+};
 
 interface BookOrganizerProps {
   initialIsbns?: string[];
@@ -61,7 +84,9 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
   const [librarySource, setLibrarySource] = useState('');
   const [libraryCategory, setLibraryCategory] = useState('');
   const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryLoadingLabel, setLibraryLoadingLabel] = useState('正在加载图书陈列库');
   const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [libraryNotice, setLibraryNotice] = useState<string | null>(null);
 
   const [results, setResults] = useState<BookMetadata[]>([]);
   const [failed, setFailed] = useState<Array<{ isbn: string; reason: string }>>([]);
@@ -84,22 +109,38 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
       const page = pageOverride ?? libraryPage;
       setLibraryLoading(true);
       setLibraryError(null);
+      setLibraryNotice(null);
       try {
-        const response = await bookApi.listLibrary({
-          page,
-          pageSize: PAGE_SIZE,
-          q: libraryQuery || undefined,
-          source: librarySource || undefined,
-          category: libraryCategory || undefined,
-        });
-        setLibraryItems(response.items);
-        setLibraryTotal(response.total);
-        setLibraryPage(response.page);
-      } catch (e) {
-        const message = e instanceof Error ? e.message : '未知错误';
-        setLibraryError(`图书陈列库加载失败：${message}`);
+        for (let attempt = 1; attempt <= LIBRARY_MAX_ATTEMPTS; attempt += 1) {
+          setLibraryLoadingLabel(attempt === 1 ? '正在加载图书陈列库' : '后端冷启动中，正在重试图书陈列库');
+          try {
+            const response = await bookApi.listLibrary({
+              page,
+              pageSize: PAGE_SIZE,
+              q: libraryQuery || undefined,
+              source: librarySource || undefined,
+              category: libraryCategory || undefined,
+            });
+            setLibraryItems(response.items);
+            setLibraryTotal(response.total);
+            setLibraryPage(response.page);
+            if (attempt > 1) {
+              setLibraryNotice('后端服务已唤醒，图书陈列库已恢复。');
+            }
+            return;
+          } catch (e) {
+            const message = getErrorMessage(e);
+            if (attempt < LIBRARY_MAX_ATTEMPTS && isTransientLibraryError(e)) {
+              setLibraryNotice('后端服务可能刚从休眠中唤醒，正在自动重试。');
+              continue;
+            }
+            setLibraryError(`图书陈列库加载失败：${message}`);
+            return;
+          }
+        }
       } finally {
         setLibraryLoading(false);
+        setLibraryLoadingLabel('正在加载图书陈列库');
       }
     },
     [libraryCategory, libraryPage, libraryQuery, librarySource],
@@ -452,6 +493,12 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
           <BookSearchBar onSearch={(isbns) => void handleSearch(isbns)} />
         </Paper>
 
+        {libraryNotice && (
+          <Alert severity="info" onClose={() => setLibraryNotice(null)}>
+            {libraryNotice}
+          </Alert>
+        )}
+
         {(error || libraryError) && (
           <Alert severity="error" onClose={() => { setError(null); setLibraryError(null); }}>
             {error || libraryError}
@@ -467,7 +514,7 @@ export function BookOrganizer({ initialIsbns = [], onUseBook, onUseBooks }: Book
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 }, borderRadius: 1, minHeight: 420 }}>
           {view === 'library' ? (
             libraryLoading ? (
-              <Loading fullScreen label="正在加载图书陈列库" />
+              <Loading fullScreen label={libraryLoadingLabel} />
             ) : libraryItems.length === 0 ? (
               <Empty title="陈列库暂无图书" description="可以先批量搜索 ISBN，或从 BookRank 导入畅销榜图书" />
             ) : (
