@@ -21,7 +21,7 @@ const SOURCE_LABELS: Record<BookMetadata['source'], string> = {
   openlibrary: '来源：Open Library',
   googlebooks: '来源：Google Books',
   bookrank: '来源：BookRank',
-  mock: '来源：Mock 数据',
+  mock: '来源：待确认',
 };
 
 const SYNC_LABELS: Record<BookMetadataSyncStatus, { label: string; color: 'default' | 'info' | 'success' | 'warning' | 'error' }> = {
@@ -29,7 +29,7 @@ const SYNC_LABELS: Record<BookMetadataSyncStatus, { label: string; color: 'defau
   syncing: { label: '同步中', color: 'info' },
   synced: { label: '已同步', color: 'success' },
   partial: { label: '基础信息已同步', color: 'info' },
-  failed: { label: '同步失败', color: 'error' },
+  failed: { label: '查无记录', color: 'warning' },
 };
 
 type SyncableBook = BookMetadata & {
@@ -78,7 +78,7 @@ export function BookCard({
       : syncStatus === 'partial'
         ? '已同步书名作者，真实简介待补充'
         : syncStatus === 'failed'
-          ? '暂未同步到真实简介，可稍后再次同步'
+          ? '外部书库暂未查到，已标记待人工确认'
           : '暂无简介信息';
 
   return (

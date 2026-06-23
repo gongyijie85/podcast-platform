@@ -75,7 +75,7 @@ export class BookController {
   @Public()
   @Get('books/library/sync/status')
   async getLibrarySyncStatus(): Promise<BookLibrarySyncStatusResult> {
-    return this.librarySync.getStatus();
+    return this.librarySync.getStatusSnapshot();
   }
 
   @Public()

@@ -10,6 +10,39 @@ const waitUntil = async (condition: () => boolean, timeoutMs = 1500): Promise<vo
 };
 
 describe('BookLibrarySyncService', () => {
+  it('returns idle status from current database counts', async () => {
+    const prisma = {
+      bookLibraryItem: {
+        findMany: jest.fn(),
+        updateMany: jest.fn(),
+        update: jest.fn(),
+        count: jest.fn().mockImplementation(({ where }: { where?: { metadataSyncStatus?: string | { in?: string[] } } } = {}) => {
+          const status = where?.metadataSyncStatus;
+          if (!status) return 130;
+          if (status === 'synced') return 95;
+          if (status === 'partial') return 18;
+          if (typeof status === 'object' && status.in?.includes('pending')) return 17;
+          return 0;
+        }),
+      },
+    };
+    const openLibrary = { fetchByIsbn: jest.fn() };
+    const googleBooks = { fetchByIsbn: jest.fn() };
+
+    const service = new BookLibrarySyncService(prisma as never, openLibrary as never, googleBooks as never);
+    const status = await service.getStatusSnapshot();
+
+    expect(status).toMatchObject({
+      running: false,
+      total: 130,
+      processed: 130,
+      updated: 95,
+      partial: 18,
+      failed: 17,
+      currentIsbn: null,
+    });
+  });
+
   it('refreshes pending mock library items and marks them as synced', async () => {
     const row = {
       id: 'lib-1',

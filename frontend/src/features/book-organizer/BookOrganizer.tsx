@@ -56,15 +56,15 @@ const SOURCE_FILTER_OPTIONS = [
   { value: 'bookrank', label: 'BookRank' },
   { value: 'openlibrary', label: 'Open Library' },
   { value: 'googlebooks', label: 'Google Books' },
-  { value: 'mock', label: '待同步/Mock' },
+  { value: 'mock', label: '待确认' },
 ];
 
 const SYNC_FILTER_OPTIONS: Array<{ value: BookLibrarySyncStatusFilter | ''; label: string }> = [
   { value: '', label: '全部状态' },
-  { value: 'incomplete', label: '未完成' },
+  { value: 'incomplete', label: '待补充' },
   { value: 'synced', label: '完整同步' },
   { value: 'partial', label: '基础信息待补' },
-  { value: 'failed', label: '同步失败' },
+  { value: 'failed', label: '查无记录' },
   { value: 'pending', label: '待同步' },
   { value: 'syncing', label: '同步中' },
 ];
@@ -263,10 +263,10 @@ export function BookOrganizer({
         const partial = status.partial ?? 0;
         setLibraryNotice(
           status.failed > 0
-            ? `后台同步完成：完整更新 ${status.updated} 本，基础信息 ${partial} 本，${status.failed} 本仍未查到。`
+            ? `后台同步完成：完整信息 ${status.updated} 本，基础信息 ${partial} 本，${status.failed} 本外部书库暂未查到，已标记待确认。`
             : partial > 0
-              ? `后台同步完成：完整更新 ${status.updated} 本，基础信息 ${partial} 本。`
-              : `后台同步完成：已完整更新 ${status.updated} 本。`,
+              ? `后台同步完成：完整信息 ${status.updated} 本，基础信息 ${partial} 本。`
+              : `后台同步完成：已获得 ${status.updated} 本完整信息。`,
         );
       }
     }, 5000);
@@ -520,7 +520,7 @@ export function BookOrganizer({
     { label: '陈列', value: libraryTotal, icon: <LibraryBooksIcon fontSize="small" /> },
     { label: '本次搜索', value: results.length, icon: <AutoStoriesIcon fontSize="small" /> },
     { label: '已选', value: selectedList.length, icon: <PlaylistAddCheckIcon fontSize="small" /> },
-    { label: '失败', value: failed.length, icon: <ReportProblemOutlinedIcon fontSize="small" /> },
+    { label: '未获取', value: failed.length, icon: <ReportProblemOutlinedIcon fontSize="small" /> },
   ];
 
   return (
@@ -593,7 +593,7 @@ export function BookOrganizer({
               >
                 {metrics.map((item) => {
                   const active = item.label === '已选' && selectedList.length > 0;
-                  const warning = item.label === '失败' && failed.length > 0;
+                  const warning = item.label === '未获取' && failed.length > 0;
                   return (
                     <Box
                       key={item.label}
@@ -960,7 +960,7 @@ export function BookOrganizer({
                     size="small"
                     color={librarySyncStatus.failed > 0 ? 'warning' : 'default'}
                     variant="outlined"
-                    label={`未完成 ${librarySyncStatus.failed} 本`}
+                    label={`待确认 ${librarySyncStatus.failed} 本`}
                   />
                 </Stack>
               </Stack>

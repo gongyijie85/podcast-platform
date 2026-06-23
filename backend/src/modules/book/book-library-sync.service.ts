@@ -57,6 +57,17 @@ export class BookLibrarySyncService {
     return this.status;
   }
 
+  async getStatusSnapshot(): Promise<BookLibrarySyncStatusResult> {
+    if (this.running) return this.status;
+
+    try {
+      return await this.buildDatabaseStatusSnapshot();
+    } catch (error) {
+      this.logger.warn(`Book library sync status snapshot failed: ${(error as Error).message}`);
+      return this.status;
+    }
+  }
+
   private async run(): Promise<void> {
     const candidates = await this.findCandidates();
     this.status = { ...this.status, total: candidates.length };
@@ -184,6 +195,28 @@ export class BookLibrarySyncService {
       processed: this.status.processed + 1,
       failed: this.status.failed + 1,
       lastError: reason,
+    };
+  }
+
+  private async buildDatabaseStatusSnapshot(): Promise<BookLibrarySyncStatusResult> {
+    const [total, synced, partial, unresolved] = await Promise.all([
+      this.prisma.bookLibraryItem.count(),
+      this.prisma.bookLibraryItem.count({ where: { metadataSyncStatus: 'synced' } }),
+      this.prisma.bookLibraryItem.count({ where: { metadataSyncStatus: 'partial' } }),
+      this.prisma.bookLibraryItem.count({
+        where: { metadataSyncStatus: { in: ['pending', 'syncing', 'failed'] } },
+      }),
+    ]);
+
+    return {
+      ...this.status,
+      running: false,
+      total,
+      processed: total,
+      updated: synced,
+      partial,
+      failed: unresolved,
+      currentIsbn: null,
     };
   }
 
