@@ -682,8 +682,9 @@ export function BookOrganizer({
                 </Typography>
                 <Stack
                   direction={{ xs: 'column', md: 'row' }}
-                  spacing={1.25}
+                  spacing={0}
                   alignItems={{ md: 'center' }}
+                  sx={{ gap: 1.25, flexWrap: 'wrap' }}
                 >
                   <TextField
                     size="small"
@@ -697,7 +698,7 @@ export function BookOrganizer({
                     InputProps={{
                       startAdornment: <SearchIcon fontSize="small" color="action" sx={{ mr: 1 }} />,
                     }}
-                    sx={{ flex: 1 }}
+                    sx={{ flex: '1 1 240px', minWidth: { xs: '100%', md: 240 } }}
                   />
                   <TextField
                     select
@@ -706,7 +707,7 @@ export function BookOrganizer({
                     value={librarySource}
                     onChange={(event) => updateLibrarySource(event.target.value)}
                     SelectProps={{ native: true }}
-                    sx={{ minWidth: 140 }}
+                    sx={{ flex: '0 1 150px', minWidth: 140 }}
                   >
                     {SOURCE_FILTER_OPTIONS.map((option) => (
                       <option key={option.value || 'all'} value={option.value}>
@@ -721,7 +722,7 @@ export function BookOrganizer({
                     value={libraryCategory}
                     onChange={(event) => updateLibraryCategory(event.target.value)}
                     SelectProps={{ native: true }}
-                    sx={{ minWidth: 160 }}
+                    sx={{ flex: '0 1 170px', minWidth: 150 }}
                   >
                     <option value="">全部分类</option>
                     <option value="new-books">新书</option>
@@ -740,7 +741,7 @@ export function BookOrganizer({
                       updateLibrarySyncFilter(event.target.value as BookLibrarySyncStatusFilter | '')
                     }
                     SelectProps={{ native: true }}
-                    sx={{ minWidth: 150 }}
+                    sx={{ flex: '0 1 160px', minWidth: 150 }}
                   >
                     {SYNC_FILTER_OPTIONS.map((option) => (
                       <option key={option.value || 'all'} value={option.value}>
