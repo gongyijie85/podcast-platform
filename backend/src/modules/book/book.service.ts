@@ -50,7 +50,7 @@ export class BookService {
       }
 
       let meta = await this.openLibrary.fetchByIsbn(isbn);
-      if (meta && !this.hasSummary(meta)) {
+      if (meta && !this.hasFullSummary(meta)) {
         meta = await this.withGoogleBooksSummary(meta, isbn);
       }
       if (!meta) meta = await this.googleBooks.fetchByIsbn(isbn);
@@ -109,15 +109,24 @@ export class BookService {
 
   private async withGoogleBooksSummary(meta: BookMetadata, isbn: string): Promise<BookMetadata> {
     const fallback = await this.googleBooks.fetchByIsbn(isbn);
-    if (!fallback || fallback.source === 'mock' || !this.hasSummary(fallback)) return meta;
+    if (!fallback || fallback.source === 'mock' || !this.hasFullSummary(fallback)) return meta;
     return {
       ...meta,
+      coverUrl: meta.coverUrl ?? fallback.coverUrl ?? null,
+      publisher: meta.publisher ?? fallback.publisher ?? null,
+      publishedDate: meta.publishedDate ?? fallback.publishedDate ?? null,
+      pageCount: meta.pageCount ?? fallback.pageCount ?? null,
       summary: fallback.summary,
     };
   }
 
   private hasSummary(meta: BookMetadata): boolean {
     return Boolean(meta.summary?.replace(/\s+/g, ' ').trim());
+  }
+
+  private hasFullSummary(meta: BookMetadata): boolean {
+    const summary = meta.summary?.replace(/\s+/g, ' ').trim();
+    return Boolean(summary && !summary.startsWith('Open Library 目录信息显示：'));
   }
 
   private async loadCachedMetadata(isbns: string[]): Promise<Map<string, BookMetadata>> {
@@ -137,7 +146,7 @@ export class BookService {
 
   private shouldUseCachedMetadata(meta: BookMetadata): boolean {
     if (meta.source === 'mock') return false;
-    return Boolean(meta.title?.trim() && meta.author?.trim() && this.hasSummary(meta));
+    return Boolean(meta.title?.trim() && meta.author?.trim());
   }
 
   private isGenericMockMetadata(meta: BookMetadata): boolean {

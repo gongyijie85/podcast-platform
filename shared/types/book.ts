@@ -11,7 +11,7 @@ export interface BookMetadata {
   source: 'openlibrary' | 'googlebooks' | 'mock' | 'bookrank';
 }
 
-export type BookMetadataSyncStatus = 'pending' | 'syncing' | 'synced' | 'failed';
+export type BookMetadataSyncStatus = 'pending' | 'syncing' | 'synced' | 'partial' | 'failed';
 
 export interface FetchMetadataPayload {
   isbns: string[];
@@ -65,6 +65,7 @@ export interface BookLibrarySyncStatusResult {
   total: number;
   processed: number;
   updated: number;
+  partial?: number;
   failed: number;
   startedAt?: string | null;
   finishedAt?: string | null;

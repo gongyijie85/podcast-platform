@@ -31,6 +31,7 @@ export class BookLibrarySyncService {
       total: 0,
       processed: 0,
       updated: 0,
+      partial: 0,
       failed: 0,
       startedAt: new Date().toISOString(),
       finishedAt: null,
@@ -96,8 +97,10 @@ export class BookLibrarySyncService {
       where: {
         OR: [
           { metadataSyncStatus: { in: ['pending', 'failed'] } },
+          { metadataSyncStatus: 'partial', summary: null },
           { source: 'mock' },
           { summary: null },
+          { summary: { startsWith: 'Open Library 目录信息显示：' } },
           { summary: 'GoogleBooksAdapter 离线 mock 数据。' },
           { title: { startsWith: 'GoogleBooks 占位' } },
         ],
@@ -110,30 +113,38 @@ export class BookLibrarySyncService {
   private async syncOne(item: PrismaBookLibraryItem): Promise<void> {
     try {
       const meta = await this.resolveRealMetadata(item.isbn);
-      if (!meta || !this.hasUsableSummary(meta)) {
-        await this.markFailed(item, meta ? 'summary_not_found' : 'metadata_not_found');
+      if (!meta) {
+        await this.markFailed(item, 'metadata_not_found');
         return;
       }
 
+      const hasFullSummary = this.hasFullSummary(meta);
+      const metadataSyncStatus = hasFullSummary ? 'synced' : 'partial';
+      const previousSummary = this.isGenericMockItem(item) ? null : item.summary;
       await this.prisma.bookLibraryItem.update({
         where: { id: item.id },
         data: {
           title: this.clean(meta.title) || item.title,
           author: this.clean(meta.author) || item.author,
           coverUrl: this.cleanNullable(meta.coverUrl) ?? item.coverUrl,
-          summary: this.cleanNullable(meta.summary),
+          summary: this.cleanNullable(meta.summary) ?? previousSummary,
           publisher: this.cleanNullable(meta.publisher) ?? item.publisher,
           publishedDate: this.cleanNullable(meta.publishedDate) ?? item.publishedDate,
           pageCount: meta.pageCount ?? item.pageCount,
           source: meta.source,
-          metadataSyncStatus: 'synced',
+          metadataSyncStatus,
           metadataSyncAttempts: { increment: 1 },
           metadataSyncedAt: new Date(),
-          metadataSyncError: null,
+          metadataSyncError: hasFullSummary ? null : 'summary_not_found',
           queryCount: { increment: 1 },
         },
       });
-      this.status = { ...this.status, processed: this.status.processed + 1, updated: this.status.updated + 1 };
+      this.status = {
+        ...this.status,
+        processed: this.status.processed + 1,
+        updated: this.status.updated + (hasFullSummary ? 1 : 0),
+        partial: (this.status.partial ?? 0) + (hasFullSummary ? 0 : 1),
+      };
     } catch (error) {
       await this.markFailed(item, (error as Error).message);
     }
@@ -141,15 +152,22 @@ export class BookLibrarySyncService {
 
   private async resolveRealMetadata(isbn: string): Promise<BookMetadata | null> {
     let meta = await this.openLibrary.fetchByIsbn(isbn);
-    if (meta && !this.hasUsableSummary(meta)) {
+    if (meta && !this.hasFullSummary(meta)) {
       const google = await this.googleBooks.fetchByIsbn(isbn);
-      if (google && google.source !== 'mock' && this.hasUsableSummary(google)) {
-        meta = { ...meta, summary: google.summary };
+      if (google && google.source !== 'mock' && !this.isGenericMock(google) && this.hasFullSummary(google)) {
+        meta = {
+          ...meta,
+          coverUrl: meta.coverUrl ?? google.coverUrl ?? null,
+          publisher: meta.publisher ?? google.publisher ?? null,
+          publishedDate: meta.publishedDate ?? google.publishedDate ?? null,
+          pageCount: meta.pageCount ?? google.pageCount ?? null,
+          summary: google.summary,
+        };
       }
     }
     if (!meta) meta = await this.googleBooks.fetchByIsbn(isbn);
     if (!meta || meta.source === 'mock' || this.isGenericMock(meta)) return null;
-    return meta;
+    return this.hasUsableIdentity(meta) ? meta : null;
   }
 
   private async markFailed(item: PrismaBookLibraryItem, reason: string): Promise<void> {
@@ -173,11 +191,36 @@ export class BookLibrarySyncService {
     return Boolean(meta.summary?.replace(/\s+/g, ' ').trim());
   }
 
+  private hasFullSummary(meta: BookMetadata): boolean {
+    return this.hasUsableSummary(meta) && !this.isCatalogDerivedSummary(meta.summary);
+  }
+
+  private hasUsableIdentity(meta: BookMetadata): boolean {
+    const title = this.clean(meta.title);
+    const author = this.clean(meta.author);
+    if (!title || title.startsWith('Untitled') || title.startsWith('GoogleBooks 占位')) return false;
+    if (author && author !== 'Unknown' && author !== '待同步') return true;
+    return Boolean(meta.coverUrl || meta.publisher || meta.publishedDate || meta.pageCount);
+  }
+
   private isGenericMock(meta: BookMetadata): boolean {
     return (
       meta.title.startsWith('GoogleBooks 占位') ||
       meta.summary?.trim() === 'GoogleBooksAdapter 离线 mock 数据。'
     );
+  }
+
+  private isGenericMockItem(item: PrismaBookLibraryItem): boolean {
+    return (
+      item.source === 'mock' &&
+      (item.title.startsWith('GoogleBooks 占位') ||
+        item.title.startsWith('待同步图书') ||
+        item.summary?.trim() === 'GoogleBooksAdapter 离线 mock 数据。')
+    );
+  }
+
+  private isCatalogDerivedSummary(summary: string | null | undefined): boolean {
+    return this.clean(summary).startsWith('Open Library 目录信息显示：');
   }
 
   private clean(value: string | null | undefined): string {
@@ -198,6 +241,7 @@ export class BookLibrarySyncService {
       total: 0,
       processed: 0,
       updated: 0,
+      partial: 0,
       failed: 0,
       startedAt: null,
       finishedAt: null,

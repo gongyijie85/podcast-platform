@@ -6,25 +6,38 @@ import type { BookApiAdapter } from './book-api.adapter';
 import type { BookMetadata } from '@shared/book';
 
 type OpenLibraryText = string | { value?: string } | null | undefined;
+type OpenLibraryNamedValue = { name?: string };
+type OpenLibraryTocItem = { title?: string };
 
 interface OpenLibraryDataBook {
+  key?: string;
   title?: string;
+  subtitle?: string;
   authors?: Array<{ name: string }>;
   cover?: { medium?: string };
   publishers?: Array<{ name: string }>;
   publish_date?: string;
   number_of_pages?: number;
+  notes?: OpenLibraryText;
+  subjects?: OpenLibraryNamedValue[];
+  subject_people?: OpenLibraryNamedValue[];
+  subject_times?: OpenLibraryNamedValue[];
+  table_of_contents?: OpenLibraryTocItem[];
 }
 
 interface OpenLibraryEdition {
   title?: string;
+  subtitle?: string;
   by_statement?: string;
   authors?: Array<{ name?: string; key?: string }>;
   covers?: number[];
   description?: OpenLibraryText;
+  notes?: OpenLibraryText;
   publishers?: string[];
   publish_date?: string;
   number_of_pages?: number;
+  subjects?: string[];
+  table_of_contents?: OpenLibraryTocItem[];
   works?: Array<{ key?: string }>;
 }
 
@@ -43,7 +56,7 @@ export class OpenLibraryAdapter implements BookApiAdapter {
   readonly name = 'openlibrary';
   private readonly logger = new Logger(OpenLibraryAdapter.name);
   private readonly http = axios.create({
-    timeout: 3000,
+    timeout: 8000,
     headers: { 'User-Agent': 'PodcastPlatform/1.0 (book metadata resolver)' },
   });
   private cache = new Map<string, { data: BookMetadata; ts: number }>();
@@ -67,10 +80,11 @@ export class OpenLibraryAdapter implements BookApiAdapter {
       const resp = await this.http.get<Record<string, unknown>>(url);
       const data = resp.data[`ISBN:${isbn}`] as OpenLibraryDataBook | undefined;
       if (!data) return null;
-      const edition = await this.fetchEdition(base, isbn);
+      const edition = await this.fetchEdition(base, isbn, data.key);
       const editionSummary = this.pickRealDescription(edition?.description);
+      const workSummary = edition?.works?.[0]?.key ? await this.fetchWorkSummary(base, edition.works[0].key) : null;
       const summary =
-        editionSummary ?? (edition?.works?.[0]?.key ? await this.fetchWorkSummary(base, edition.works[0].key) : null);
+        editionSummary ?? workSummary ?? this.buildCatalogSummary(data, edition);
       const meta: BookMetadata = {
         isbn,
         title: data.title ?? edition?.title ?? `Untitled (${isbn})`,
@@ -85,20 +99,28 @@ export class OpenLibraryAdapter implements BookApiAdapter {
       this.cache.set(isbn, { data: meta, ts: Date.now() });
       return meta;
     } catch (e) {
-      if (axios.isAxiosError(e) && (e.code === 'ECONNABORTED' || !e.response)) {
-        this.unavailableUntil = Date.now() + 30_000;
+      if (axios.isAxiosError(e) && !e.response && e.code !== 'ECONNABORTED') {
+        this.unavailableUntil = Date.now() + 5_000;
       }
       this.logger.warn(`OpenLibrary unreachable, falling back to mock: ${(e as Error).message}`);
       return this.mockLookup(isbn);
     }
   }
 
-  private async fetchEdition(base: string, isbn: string): Promise<OpenLibraryEdition | null> {
+  private async fetchEdition(base: string, isbn: string, editionKey?: string): Promise<OpenLibraryEdition | null> {
     try {
       const resp = await this.http.get<OpenLibraryEdition>(`${base}/isbn/${isbn}.json`);
       return resp.data;
     } catch (e) {
       this.logger.debug?.(`OpenLibrary edition details unavailable for ${isbn}: ${(e as Error).message}`);
+      if (!editionKey) return null;
+    }
+
+    try {
+      const resp = await this.http.get<OpenLibraryEdition>(`${base}${editionKey}.json`);
+      return resp.data;
+    } catch (e) {
+      this.logger.debug?.(`OpenLibrary edition key details unavailable for ${isbn}: ${(e as Error).message}`);
       return null;
     }
   }
@@ -131,6 +153,70 @@ export class OpenLibraryAdapter implements BookApiAdapter {
     if (/^Includes\s+(bibliographical references|index)/i.test(cleaned)) return null;
 
     return cleaned;
+  }
+
+  private buildCatalogSummary(data: OpenLibraryDataBook, edition: OpenLibraryEdition | null): string | null {
+    const title = this.cleanText(data.title ?? edition?.title);
+    if (!title) return null;
+
+    const subtitle = this.cleanText(data.subtitle ?? edition?.subtitle);
+    const author = this.cleanText((data.authors ?? []).map((item) => item.name).join(', ') || edition?.by_statement);
+    const subjects = this.unique([
+      ...this.namedValues(data.subjects),
+      ...this.namedValues(data.subject_people),
+      ...this.namedValues(data.subject_times),
+      ...(edition?.subjects ?? []),
+    ])
+      .filter((item) => !this.isWeakCatalogTerm(item))
+      .slice(0, 6);
+    const toc = this.unique([...(data.table_of_contents ?? []), ...(edition?.table_of_contents ?? [])]
+      .map((item) => this.cleanText(item.title))
+      .filter(Boolean) as string[])
+      .slice(0, 4);
+    const note = this.pickCatalogNote(edition?.notes ?? data.notes);
+    const hasCatalogDetail = subtitle || subjects.length > 0 || toc.length > 0 || note;
+    if (!hasCatalogDetail) return null;
+
+    const parts = [`${title}${subtitle ? `：${subtitle}` : ''}`];
+    if (author) parts.push(`作者/编者为 ${author}`);
+    if (subjects.length > 0) parts.push(`主题包括 ${subjects.join('、')}`);
+    if (toc.length > 0) parts.push(`目录覆盖 ${toc.join('、')}`);
+    if (note) parts.push(note);
+
+    return `Open Library 目录信息显示：${parts.join('；')}。`;
+  }
+
+  private pickCatalogNote(value: OpenLibraryText): string | null {
+    const raw = typeof value === 'string' ? value : value?.value;
+    const cleaned = this.cleanText(raw);
+    if (!cleaned) return null;
+    const usefulLines = cleaned
+      .split(/(?:(?:\r?\n)+|;\s*)/)
+      .map((line) => this.cleanText(line.replace(/\.$/, '')))
+      .filter(Boolean)
+      .filter((line) => !/^Includes\s+(index|bibliographical references)$/i.test(line))
+      .slice(0, 2);
+    return usefulLines.length > 0 ? `备注：${usefulLines.join('；')}` : null;
+  }
+
+  private namedValues(values: OpenLibraryNamedValue[] | undefined): string[] {
+    return (values ?? []).map((item) => this.cleanText(item.name)).filter(Boolean) as string[];
+  }
+
+  private unique(values: string[]): string[] {
+    return Array.from(new Set(values.map((value) => this.cleanText(value)).filter(Boolean) as string[]));
+  }
+
+  private cleanText(value: string | null | undefined): string {
+    return value
+      ?.replace(/<[^>]+>/g, '')
+      .replace(/\[[^\]]+\]\([^)]+\)/g, '')
+      .replace(/\s+/g, ' ')
+      .trim() ?? '';
+  }
+
+  private isWeakCatalogTerm(value: string): boolean {
+    return /^(general|quality or trade paperback|juvenile literature|fiction|nonfiction)$/i.test(value.trim());
   }
 
   private coverFromEdition(edition: OpenLibraryEdition | null): string | null {

@@ -217,10 +217,13 @@ export function BookOrganizer({
       const status = await loadLibrarySyncStatus();
       if (status && !status.running) {
         void loadLibrary(1);
+        const partial = status.partial ?? 0;
         setLibraryNotice(
           status.failed > 0
-            ? `后台同步完成：更新 ${status.updated} 本，${status.failed} 本暂未同步到真实简介。`
-            : `后台同步完成：已更新 ${status.updated} 本。`,
+            ? `后台同步完成：完整更新 ${status.updated} 本，基础信息 ${partial} 本，${status.failed} 本仍未查到。`
+            : partial > 0
+              ? `后台同步完成：完整更新 ${status.updated} 本，基础信息 ${partial} 本。`
+              : `后台同步完成：已完整更新 ${status.updated} 本。`,
         );
       }
     }, 5000);
@@ -792,9 +795,19 @@ export function BookOrganizer({
         )}
 
         {librarySyncStatus && (librarySyncStatus.running || librarySyncStatus.finishedAt) && (
-          <Alert severity={librarySyncStatus.running ? 'info' : librarySyncStatus.failed > 0 ? 'warning' : 'success'}>
+          <Alert
+            severity={
+              librarySyncStatus.running
+                ? 'info'
+                : librarySyncStatus.failed > 0 || (librarySyncStatus.partial ?? 0) > 0
+                  ? 'warning'
+                  : 'success'
+            }
+          >
             后台同步：{librarySyncStatus.processed}/{librarySyncStatus.total} 本 · 已更新{' '}
-            {librarySyncStatus.updated} 本 · 未完成 {librarySyncStatus.failed} 本
+            {librarySyncStatus.updated} 本
+            {librarySyncStatus.partial ? ` · 基础信息 ${librarySyncStatus.partial} 本` : ''}
+            {' '}· 未完成 {librarySyncStatus.failed} 本
             {librarySyncStatus.currentIsbn ? ` · 当前 ${librarySyncStatus.currentIsbn}` : ''}
           </Alert>
         )}

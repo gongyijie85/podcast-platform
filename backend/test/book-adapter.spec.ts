@@ -48,6 +48,51 @@ describe('Book adapters (mock fallback)', () => {
     ).toContain('moral courage');
   });
 
+  it('OpenLibraryAdapter builds a catalog-derived summary when no description is available', async () => {
+    const a = new OpenLibraryAdapter(cfg());
+    const get = jest.fn((url: string) => {
+      if (url.includes('/api/books')) {
+        return Promise.resolve({
+          data: {
+            'ISBN:9780805208511': {
+              key: '/books/OL2401971M',
+              title: 'Letters to Felice',
+              authors: [{ name: 'Franz Kafka' }],
+              publishers: [{ name: 'Schocken Books' }],
+              publish_date: '1988',
+              number_of_pages: 592,
+              subjects: [{ name: 'Correspondence' }, { name: 'Austrian Authors' }],
+              subject_people: [{ name: 'Felice Bauer (1887-1960)' }],
+              subject_times: [{ name: '20th century' }],
+            },
+          },
+        });
+      }
+      return Promise.resolve({
+        data: {
+          title: 'Letters to Felice',
+          publishers: ['Schocken Books'],
+          publish_date: '1988',
+          number_of_pages: 592,
+          notes: 'Includes index.',
+        },
+      });
+    });
+    (a as unknown as { http: { get: jest.Mock } }).http.get = get;
+
+    const r = await a.fetchByIsbn('9780805208511');
+
+    expect(r).toMatchObject({
+      isbn: '9780805208511',
+      title: 'Letters to Felice',
+      author: 'Franz Kafka',
+      source: 'openlibrary',
+    });
+    expect(r!.summary).toContain('Open Library 目录信息显示');
+    expect(r!.summary).toContain('Correspondence');
+    expect(r!.summary).toContain('Felice Bauer');
+  });
+
   it('GoogleBooksAdapter returns null for unknown ISBNs instead of generic placeholders', async () => {
     const a = new GoogleBooksAdapter(cfg());
     const r = await a.fetchByIsbn('9999999999999');

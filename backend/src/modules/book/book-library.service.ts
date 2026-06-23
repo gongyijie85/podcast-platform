@@ -258,7 +258,7 @@ export class BookLibraryService {
 
   private initialSyncStatus(book: BookMetadata | BookRankMappedBook): BookMetadataSyncStatus {
     if (book.source === 'mock') return 'pending';
-    return this.cleanNullable(book.summary) ? 'synced' : 'pending';
+    return this.hasFullSummary(book.summary) ? 'synced' : 'partial';
   }
 
   private syncStatusPatch(book: BookMetadata | BookRankMappedBook): Record<string, unknown> {
@@ -268,6 +268,13 @@ export class BookLibraryService {
         metadataSyncStatus: 'synced',
         metadataSyncedAt: new Date(),
         metadataSyncError: null,
+      };
+    }
+    if (syncStatus === 'partial') {
+      return {
+        metadataSyncStatus: 'partial',
+        metadataSyncedAt: new Date(),
+        metadataSyncError: 'summary_not_found',
       };
     }
     if (book.source === 'mock') {
@@ -281,9 +288,11 @@ export class BookLibraryService {
     item: { source: string; summary: string | null },
     genericMock: boolean,
   ): BookMetadataSyncStatus {
-    if (value === 'pending' || value === 'syncing' || value === 'synced' || value === 'failed') return value;
-    if (genericMock || item.source === 'mock' || !item.summary) return 'pending';
-    return 'synced';
+    if (value === 'pending' || value === 'syncing' || value === 'synced' || value === 'partial' || value === 'failed') {
+      return value;
+    }
+    if (genericMock || item.source === 'mock') return 'pending';
+    return this.hasFullSummary(item.summary) ? 'synced' : 'partial';
   }
 
   private isGenericMockItem(item: { source: string; title: string; summary: string | null }): boolean {
@@ -313,6 +322,11 @@ export class BookLibraryService {
   private cleanNullable(value: string | null | undefined): string | null {
     const text = value?.replace(/\s+/g, ' ').trim();
     return text || null;
+  }
+
+  private hasFullSummary(value: string | null | undefined): boolean {
+    const text = this.cleanNullable(value);
+    return Boolean(text && !text.startsWith('Open Library 目录信息显示：'));
   }
 
   private clampInt(value: unknown, min: number, max: number, fallback: number): number {

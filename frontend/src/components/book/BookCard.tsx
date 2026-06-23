@@ -28,6 +28,7 @@ const SYNC_LABELS: Record<BookMetadataSyncStatus, { label: string; color: 'defau
   pending: { label: '待同步', color: 'warning' },
   syncing: { label: '同步中', color: 'info' },
   synced: { label: '已同步', color: 'success' },
+  partial: { label: '基础信息已同步', color: 'info' },
   failed: { label: '同步失败', color: 'error' },
 };
 
@@ -74,9 +75,11 @@ export function BookCard({
   const missingSummaryText =
     syncStatus === 'pending' || syncStatus === 'syncing'
       ? '正在后台同步真实图书简介'
-      : syncStatus === 'failed'
-        ? '暂未同步到真实简介，可稍后再次同步'
-        : '暂无简介信息';
+      : syncStatus === 'partial'
+        ? '已同步书名作者，真实简介待补充'
+        : syncStatus === 'failed'
+          ? '暂未同步到真实简介，可稍后再次同步'
+          : '暂无简介信息';
 
   return (
     <Card
@@ -212,7 +215,7 @@ export function BookCard({
                     size="small"
                     label={syncMeta.label}
                     color={syncMeta.color}
-                    variant={syncStatus === 'synced' ? 'filled' : 'outlined'}
+                    variant={syncStatus === 'synced' || syncStatus === 'partial' ? 'filled' : 'outlined'}
                   />
                 </Tooltip>
               )}

@@ -72,4 +72,74 @@ describe('BookLibrarySyncService', () => {
     }));
     expect(service.getStatus()).toMatchObject({ running: false, total: 1, processed: 1, updated: 1, failed: 0 });
   });
+
+  it('keeps real metadata as partial when the summary is still missing', async () => {
+    const row = {
+      id: 'lib-2',
+      isbn: '9780805208511',
+      title: '待同步图书 (9780805208511)',
+      author: '待同步',
+      coverUrl: null,
+      summary: null,
+      publisher: null,
+      publishedDate: null,
+      pageCount: null,
+      source: 'mock',
+      category: null,
+      categoryName: null,
+      rank: null,
+      queryCount: 1,
+      metadataSyncStatus: 'pending',
+      metadataSyncAttempts: 0,
+      metadataSyncedAt: null,
+      metadataSyncError: null,
+      firstSeenAt: new Date('2026-06-22T00:00:00.000Z'),
+      lastSeenAt: new Date('2026-06-22T00:00:00.000Z'),
+    };
+    const prisma = {
+      bookLibraryItem: {
+        findMany: jest.fn().mockResolvedValue([row]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const openLibrary = {
+      fetchByIsbn: jest.fn().mockResolvedValue({
+        isbn: '9780805208511',
+        title: 'Letters to Felice',
+        author: 'Franz Kafka',
+        coverUrl: 'https://covers.openlibrary.org/b/id/4126170-M.jpg',
+        summary: null,
+        publisher: 'Schocken Books',
+        publishedDate: '1988',
+        pageCount: 592,
+        source: 'openlibrary',
+      } satisfies BookMetadata),
+    };
+    const googleBooks = { fetchByIsbn: jest.fn().mockResolvedValue(null) };
+
+    const service = new BookLibrarySyncService(prisma as never, openLibrary as never, googleBooks as never);
+    service.start();
+
+    await waitUntil(() => !service.getStatus().running);
+
+    expect(prisma.bookLibraryItem.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'lib-2' },
+      data: expect.objectContaining({
+        title: 'Letters to Felice',
+        author: 'Franz Kafka',
+        source: 'openlibrary',
+        metadataSyncStatus: 'partial',
+        metadataSyncError: 'summary_not_found',
+      }),
+    }));
+    expect(service.getStatus()).toMatchObject({
+      running: false,
+      total: 1,
+      processed: 1,
+      updated: 0,
+      partial: 1,
+      failed: 0,
+    });
+  });
 });
