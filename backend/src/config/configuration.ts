@@ -1,6 +1,13 @@
 // Centralized configuration. All env vars go through here.
+const redisUrl = process.env.REDIS_URL ? new URL(process.env.REDIS_URL) : null;
+
+const parseIntEnv = (value: string | undefined, fallback: number): number => {
+  const parsed = parseInt(value || '', 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 export const configuration = () => ({
-  port: parseInt(process.env.PORT || '3001', 10),
+  port: parseIntEnv(process.env.PORT, 3001),
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173')
     .split(',')
     .map((s) => s.trim())
@@ -15,9 +22,16 @@ export const configuration = () => ({
     url: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/podcast',
   },
   redis: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
-    password: process.env.REDIS_PASSWORD || undefined,
+    url: process.env.REDIS_URL || '',
+    host: process.env.REDIS_HOST || redisUrl?.hostname || 'localhost',
+    port: parseIntEnv(process.env.REDIS_PORT || redisUrl?.port, 6379),
+    username: process.env.REDIS_USERNAME || (redisUrl?.username ? decodeURIComponent(redisUrl.username) : undefined),
+    password: process.env.REDIS_PASSWORD || (redisUrl?.password ? decodeURIComponent(redisUrl.password) : undefined),
+    tls: process.env.REDIS_TLS === 'true' || redisUrl?.protocol === 'rediss:',
+  },
+  queue: {
+    mode: process.env.QUEUE_MODE || (process.env.REDIS_HOST || process.env.REDIS_URL ? 'redis' : 'local'),
+    enqueueTimeoutMs: parseIntEnv(process.env.QUEUE_ENQUEUE_TIMEOUT_MS, 3000),
   },
   storage: {
     driver: (process.env.STORAGE_DRIVER || 'minio') as 'minio' | 'oss' | 'local',
@@ -81,10 +95,10 @@ export const configuration = () => ({
     },
   },
   limits: {
-    maxBooks: parseInt(process.env.MAX_BOOKS_PER_PROJECT || '20', 10),
-    maxScriptWords: parseInt(process.env.MAX_SCRIPT_WORDS || '3000', 10),
-    maxScriptDurationMs: parseInt(process.env.MAX_SCRIPT_DURATION_MS || '900000', 10),
-    maxRetry: parseInt(process.env.MAX_RETRY || '3', 10),
+    maxBooks: parseIntEnv(process.env.MAX_BOOKS_PER_PROJECT, 20),
+    maxScriptWords: parseIntEnv(process.env.MAX_SCRIPT_WORDS, 3000),
+    maxScriptDurationMs: parseIntEnv(process.env.MAX_SCRIPT_DURATION_MS, 900000),
+    maxRetry: parseIntEnv(process.env.MAX_RETRY, 3),
   },
 });
 

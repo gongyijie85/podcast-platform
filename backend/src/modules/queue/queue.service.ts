@@ -1,15 +1,22 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { ConfigService } from '@nestjs/config';
 import { nanoid } from 'nanoid';
-import { QUEUE_NAMES, Stage } from './constants';
+import { QUEUE_NAMES, STAGE_WEIGHTS, Stage } from './constants';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ScriptService } from '../script/script.service';
+import { TtsService } from '../tts/tts.service';
+import { SubtitleService } from '../subtitle/subtitle.service';
+import { MixService } from '../mix/mix.service';
 import type { ProgressEvent } from '@shared/job';
 import type { RegenerateProjectPayload } from '@shared/project';
 
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
+  private readonly localJobs = new Set<string>();
+  private redisUnavailableUntil = 0;
 
   constructor(
     @InjectQueue(QUEUE_NAMES.METADATA) private readonly metadataQ: Queue,
@@ -18,6 +25,15 @@ export class QueueService {
     @InjectQueue(QUEUE_NAMES.SUBTITLE) private readonly subtitleQ: Queue,
     @InjectQueue(QUEUE_NAMES.MIX) private readonly mixQ: Queue,
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    @Inject(forwardRef(() => ScriptService))
+    private readonly scriptService: ScriptService,
+    @Inject(forwardRef(() => TtsService))
+    private readonly ttsService: TtsService,
+    @Inject(forwardRef(() => SubtitleService))
+    private readonly subtitleService: SubtitleService,
+    @Inject(forwardRef(() => MixService))
+    private readonly mixService: MixService,
   ) {}
 
   getQueue(name: string): Queue {
@@ -53,31 +69,71 @@ export class QueueService {
       mix: `mix-${projectId}-${nanoid(6)}`,
     };
     // Start from script; metadata is handled separately at /api/books/metadata.
-    await this.scriptQ.add('generateScript', { projectId, scriptOptions }, { jobId: ids.script });
+    await this.addOrRunLocal(
+      this.scriptQ,
+      'generateScript',
+      { projectId, scriptOptions },
+      ids.script,
+      'script',
+      projectId,
+      () => this.scriptService.generateForProject(projectId, scriptOptions),
+    );
     return { jobIds: ids };
   }
 
   async enqueueScript(projectId: string, scriptOptions: RegenerateProjectPayload = {}): Promise<string> {
     const id = `script-${projectId}-${nanoid(6)}`;
-    await this.scriptQ.add('generateScript', { projectId, scriptOptions }, { jobId: id });
+    await this.addOrRunLocal(
+      this.scriptQ,
+      'generateScript',
+      { projectId, scriptOptions },
+      id,
+      'script',
+      projectId,
+      () => this.scriptService.generateForProject(projectId, scriptOptions),
+    );
     return id;
   }
 
   async enqueueTts(projectId: string): Promise<string> {
     const id = `tts-${projectId}-${nanoid(6)}`;
-    await this.ttsQ.add('synthesize', { projectId }, { jobId: id });
+    await this.addOrRunLocal(
+      this.ttsQ,
+      'synthesize',
+      { projectId },
+      id,
+      'tts',
+      projectId,
+      () => this.ttsService.synthesizeAllForProject(projectId),
+    );
     return id;
   }
 
   async enqueueSubtitle(projectId: string): Promise<string> {
     const id = `subtitle-${projectId}-${nanoid(6)}`;
-    await this.subtitleQ.add('build', { projectId }, { jobId: id });
+    await this.addOrRunLocal(
+      this.subtitleQ,
+      'build',
+      { projectId },
+      id,
+      'subtitle',
+      projectId,
+      () => this.subtitleService.buildForProject(projectId),
+    );
     return id;
   }
 
   async enqueueMix(projectId: string): Promise<string> {
     const id = `mix-${projectId}-${nanoid(6)}`;
-    await this.mixQ.add('mix', { projectId }, { jobId: id });
+    await this.addOrRunLocal(
+      this.mixQ,
+      'mix',
+      { projectId },
+      id,
+      'mix',
+      projectId,
+      () => this.mixService.mixProject(projectId),
+    );
     return id;
   }
 
@@ -130,6 +186,117 @@ export class QueueService {
         where: { id: event.projectId },
         data: { progress: event.progress, currentStage: event.stage, status: 'generating' },
       });
+    }
+  }
+
+  private async addOrRunLocal(
+    queue: Queue,
+    jobName: string,
+    data: Record<string, unknown>,
+    jobId: string,
+    stage: Stage,
+    projectId: string,
+    localRunner: () => Promise<unknown>,
+  ): Promise<void> {
+    if (this.shouldUseLocalQueue()) {
+      this.scheduleLocalStage(stage, projectId, localRunner, 'local queue mode');
+      return;
+    }
+
+    try {
+      await this.withTimeout(
+        queue.add(jobName, data, { jobId }),
+        this.enqueueTimeoutMs(),
+        `enqueue ${jobName}`,
+      );
+    } catch (error) {
+      this.redisUnavailableUntil = Date.now() + 60_000;
+      this.logger.warn(
+        `Queue enqueue failed for ${stage} project=${projectId}; using local background runner: ${(error as Error).message}`,
+      );
+      this.scheduleLocalStage(stage, projectId, localRunner, 'redis enqueue fallback');
+    }
+  }
+
+  private scheduleLocalStage(
+    stage: Stage,
+    projectId: string,
+    runner: () => Promise<unknown>,
+    reason: string,
+  ): void {
+    const key = `${stage}:${projectId}`;
+    if (this.localJobs.has(key)) {
+      this.logger.debug(`Local ${stage} runner already scheduled for project=${projectId}`);
+      return;
+    }
+
+    this.localJobs.add(key);
+    this.logger.warn(`Scheduling local ${stage} runner for project=${projectId} (${reason})`);
+    setImmediate(() => {
+      void this.runLocalStage(stage, projectId, runner, key);
+    });
+  }
+
+  private async runLocalStage(
+    stage: Stage,
+    projectId: string,
+    runner: () => Promise<unknown>,
+    key: string,
+  ): Promise<void> {
+    try {
+      await this.prisma.project.update({
+        where: { id: projectId },
+        data: {
+          status: 'generating',
+          currentStage: stage,
+          progress: STAGE_WEIGHTS[stage],
+        },
+      }).catch(() => undefined);
+      await runner();
+    } catch (error) {
+      const message = (error as Error).message || 'local queue stage failed';
+      this.logger.error(`Local ${stage} runner failed for project=${projectId}: ${message}`, (error as Error).stack);
+      await this.prisma.errorLog.create({
+        data: {
+          userId: null,
+          stage,
+          message,
+          context: { projectId, queueMode: this.queueMode() },
+        },
+      }).catch(() => undefined);
+      await this.prisma.project.update({
+        where: { id: projectId },
+        data: { status: 'failed', currentStage: stage },
+      }).catch(() => undefined);
+    } finally {
+      this.localJobs.delete(key);
+    }
+  }
+
+  private shouldUseLocalQueue(): boolean {
+    return this.queueMode() === 'local' || Date.now() < this.redisUnavailableUntil;
+  }
+
+  private queueMode(): 'redis' | 'local' {
+    return this.config.get<string>('queue.mode') === 'redis' ? 'redis' : 'local';
+  }
+
+  private enqueueTimeoutMs(): number {
+    const value = this.config.get<number>('queue.enqueueTimeoutMs') ?? 3000;
+    return Math.max(250, value);
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    let timer: NodeJS.Timeout | null = null;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 }

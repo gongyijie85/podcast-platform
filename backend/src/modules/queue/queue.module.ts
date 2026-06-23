@@ -27,7 +27,11 @@ import { QUEUE_NAMES } from './constants';
         connection: {
           host: config.get<string>('redis.host'),
           port: config.get<number>('redis.port'),
+          username: config.get<string>('redis.username') || undefined,
           password: config.get<string>('redis.password') || undefined,
+          tls: config.get<boolean>('redis.tls') ? {} : undefined,
+          enableOfflineQueue: false,
+          connectTimeout: config.get<number>('queue.enqueueTimeoutMs') || 3000,
         },
         defaultJobOptions: {
           attempts: config.get<number>('limits.maxRetry') || 3,
