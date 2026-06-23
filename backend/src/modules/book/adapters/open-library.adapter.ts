@@ -139,6 +139,8 @@ export class OpenLibraryAdapter implements BookApiAdapter {
   }
 
   private mockLookup(isbn: string): BookMetadata | null {
+    if (this.config.get<boolean>('thirdParty.bookMetadata.allowMock') !== true) return null;
+
     const mock: BookMetadata[] = [
       {
         isbn: '9787121362200',

@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   resolveMetadata: vi.fn(),
   listLibrary: vi.fn(),
   importBookRank: vi.fn(),
+  syncLibrary: vi.fn(),
+  getLibrarySyncStatus: vi.fn(),
   createProject: vi.fn(),
   generateProject: vi.fn(),
   regenerateProject: vi.fn(),
@@ -102,6 +104,8 @@ vi.mock('../api/book.api', () => ({
     resolveMetadata: mocks.resolveMetadata,
     listLibrary: mocks.listLibrary,
     importBookRank: mocks.importBookRank,
+    syncLibrary: mocks.syncLibrary,
+    getLibrarySyncStatus: mocks.getLibrarySyncStatus,
   },
 }));
 
@@ -180,6 +184,17 @@ describe('page experience improvements', () => {
     mocks.resolveMetadata.mockResolvedValue({ items: [], failed: [] });
     mocks.listLibrary.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 10 });
     mocks.importBookRank.mockResolvedValue({ imported: 0, items: [] });
+    mocks.syncLibrary.mockResolvedValue({
+      accepted: true,
+      status: { running: true, total: 0, processed: 0, updated: 0, failed: 0 },
+    });
+    mocks.getLibrarySyncStatus.mockResolvedValue({
+      running: false,
+      total: 0,
+      processed: 0,
+      updated: 0,
+      failed: 0,
+    });
   });
 
   it('shows a metadata error without creating local fallback books', async () => {
@@ -295,6 +310,51 @@ describe('page experience improvements', () => {
       category: 'hardcover-fiction',
       limit: 20,
     });
+  });
+
+  it('starts silent library metadata sync and marks pending books', async () => {
+    mocks.listLibrary.mockResolvedValue({
+      items: [
+        {
+          id: 'mock-lib-1',
+          isbn: '9781785989117',
+          title: '待同步图书 (9781785989117)',
+          author: '待同步',
+          coverUrl: null,
+          summary: null,
+          source: 'mock',
+          category: null,
+          categoryName: null,
+          rank: null,
+          queryCount: 1,
+          metadataSyncStatus: 'pending',
+          metadataSyncAttempts: 0,
+          metadataSyncedAt: null,
+          metadataSyncError: null,
+          firstSeenAt: '2026-06-22T00:00:00.000Z',
+          lastSeenAt: '2026-06-22T00:00:00.000Z',
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+    });
+    mocks.syncLibrary.mockResolvedValueOnce({
+      accepted: true,
+      status: { running: true, total: 12, processed: 3, updated: 2, failed: 1, currentIsbn: '9781785989117' },
+    });
+
+    render(<BookSearch />, { wrapper: MemoryRouter });
+
+    expect(await screen.findByText('待同步图书 (9781785989117)')).toBeInTheDocument();
+    expect(screen.getAllByText('待同步').length).toBeGreaterThan(0);
+    expect(screen.getByText('正在后台同步真实图书简介')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '静默同步' }));
+
+    await waitFor(() => expect(mocks.syncLibrary).toHaveBeenCalled());
+    expect(await screen.findByText(/后台同步：3\/12 本/)).toBeInTheDocument();
+    expect(screen.queryByText('GoogleBooksAdapter 离线 mock 数据。')).not.toBeInTheDocument();
   });
 
   it('retries the shared book library when the backend is waking up', async () => {

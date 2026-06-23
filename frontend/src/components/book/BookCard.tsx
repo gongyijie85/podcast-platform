@@ -15,13 +15,25 @@ import {
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import type { BookMetadata } from '@shared/book';
+import type { BookMetadata, BookMetadataSyncStatus } from '@shared/book';
 
 const SOURCE_LABELS: Record<BookMetadata['source'], string> = {
   openlibrary: '来源：Open Library',
   googlebooks: '来源：Google Books',
   bookrank: '来源：BookRank',
   mock: '来源：Mock 数据',
+};
+
+const SYNC_LABELS: Record<BookMetadataSyncStatus, { label: string; color: 'default' | 'info' | 'success' | 'warning' | 'error' }> = {
+  pending: { label: '待同步', color: 'warning' },
+  syncing: { label: '同步中', color: 'info' },
+  synced: { label: '已同步', color: 'success' },
+  failed: { label: '同步失败', color: 'error' },
+};
+
+type SyncableBook = BookMetadata & {
+  metadataSyncStatus?: BookMetadataSyncStatus;
+  metadataSyncError?: string | null;
 };
 
 interface Props {
@@ -56,6 +68,15 @@ export function BookCard({
   const rank = 'rank' in book && typeof book.rank === 'number' ? book.rank : null;
   const categoryName =
     'categoryName' in book && typeof book.categoryName === 'string' ? book.categoryName : null;
+  const syncStatus = (book as SyncableBook).metadataSyncStatus;
+  const syncMeta = syncStatus ? SYNC_LABELS[syncStatus] : null;
+  const syncError = (book as SyncableBook).metadataSyncError;
+  const missingSummaryText =
+    syncStatus === 'pending' || syncStatus === 'syncing'
+      ? '正在后台同步真实图书简介'
+      : syncStatus === 'failed'
+        ? '暂未同步到真实简介，可稍后再次同步'
+        : '暂无简介信息';
 
   return (
     <Card
@@ -185,6 +206,16 @@ export function BookCard({
                 variant="outlined"
                 sx={{ bgcolor: 'background.default' }}
               />
+              {syncMeta && (
+                <Tooltip title={syncStatus === 'failed' && syncError ? syncError : ''}>
+                  <Chip
+                    size="small"
+                    label={syncMeta.label}
+                    color={syncMeta.color}
+                    variant={syncStatus === 'synced' ? 'filled' : 'outlined'}
+                  />
+                </Tooltip>
+              )}
             </Stack>
             {book.summary ? (
               <Typography
@@ -207,7 +238,7 @@ export function BookCard({
                 color="text.secondary"
                 sx={{ mt: 1, fontStyle: 'italic' }}
               >
-                暂无简介信息
+                {missingSummaryText}
               </Typography>
             )}
           </Box>

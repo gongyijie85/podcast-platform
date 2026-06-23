@@ -19,6 +19,7 @@ import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
 import SearchIcon from '@mui/icons-material/Search';
+import SyncIcon from '@mui/icons-material/Sync';
 import { useTranslation } from 'react-i18next';
 import { BookSearchBar } from '../../components/book/BookSearchBar';
 import { BookCard } from '../../components/book/BookCard';
@@ -27,7 +28,12 @@ import { Loading } from '../../components/common/Loading';
 import { bookApi } from '../../api/book.api';
 import { useUiStore } from '../../store/ui.store';
 import { normalizeIsbn } from '../../utils/isbn';
-import type { BookLibraryItem, BookMetadata, BookRankImportPayload } from '@shared/book';
+import type {
+  BookLibraryItem,
+  BookLibrarySyncStatusResult,
+  BookMetadata,
+  BookRankImportPayload,
+} from '@shared/book';
 
 const PAGE_SIZE = 10;
 const LIBRARY_MAX_ATTEMPTS = 2;
@@ -122,6 +128,8 @@ export function BookOrganizer({
   const [libraryLoadingLabel, setLibraryLoadingLabel] = useState('正在加载图书陈列库');
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [libraryNotice, setLibraryNotice] = useState<string | null>(null);
+  const [librarySyncStatus, setLibrarySyncStatus] = useState<BookLibrarySyncStatusResult | null>(null);
+  const [librarySyncStarting, setLibrarySyncStarting] = useState(false);
 
   const [results, setResults] = useState<BookMetadata[]>([]);
   const [failed, setFailed] = useState<Array<{ isbn: string; reason: string }>>([]);
@@ -188,6 +196,36 @@ export function BookOrganizer({
   useEffect(() => {
     void loadLibrary();
   }, [loadLibrary]);
+
+  const loadLibrarySyncStatus = useCallback(async (): Promise<BookLibrarySyncStatusResult | null> => {
+    try {
+      const status = await bookApi.getLibrarySyncStatus();
+      setLibrarySyncStatus(status);
+      return status;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLibrarySyncStatus();
+  }, [loadLibrarySyncStatus]);
+
+  useEffect(() => {
+    if (!librarySyncStatus?.running) return undefined;
+    const timer = setInterval(async () => {
+      const status = await loadLibrarySyncStatus();
+      if (status && !status.running) {
+        void loadLibrary(1);
+        setLibraryNotice(
+          status.failed > 0
+            ? `后台同步完成：更新 ${status.updated} 本，${status.failed} 本暂未同步到真实简介。`
+            : `后台同步完成：已更新 ${status.updated} 本。`,
+        );
+      }
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [librarySyncStatus?.running, loadLibrary, loadLibrarySyncStatus]);
 
   useEffect(() => {
     if (initialIsbns.length > 0) {
@@ -322,6 +360,28 @@ export function BookOrganizer({
       push('BookRank 导入失败', 'error');
     } finally {
       setImporting(false);
+    }
+  };
+
+  const startLibrarySync = async (): Promise<void> => {
+    setLibrarySyncStarting(true);
+    setLibraryError(null);
+    try {
+      const response = await bookApi.syncLibrary();
+      setLibrarySyncStatus(response.status);
+      if (response.accepted) {
+        setLibraryNotice('已开始后台静默同步真实图书数据，页面可以继续使用。');
+        push('后台同步已开始', 'success');
+      } else {
+        setLibraryNotice('后台同步正在进行中。');
+        push('后台同步正在进行中', 'info');
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '未知错误';
+      setLibraryError(`后台同步启动失败：${message}`);
+      push('后台同步启动失败', 'error');
+    } finally {
+      setLibrarySyncStarting(false);
     }
   };
 
@@ -609,6 +669,14 @@ export function BookOrganizer({
                   >
                     刷新
                   </Button>
+                  <Button
+                    startIcon={<SyncIcon />}
+                    onClick={() => void startLibrarySync()}
+                    disabled={librarySyncStarting || librarySyncStatus?.running}
+                    sx={{ whiteSpace: 'nowrap' }}
+                  >
+                    {librarySyncStatus?.running ? '同步中' : '静默同步'}
+                  </Button>
                 </Stack>
               </Box>
 
@@ -720,6 +788,14 @@ export function BookOrganizer({
         {searchNotice && (
           <Alert severity="info" onClose={() => setSearchNotice(null)}>
             {searchNotice}
+          </Alert>
+        )}
+
+        {librarySyncStatus && (librarySyncStatus.running || librarySyncStatus.finishedAt) && (
+          <Alert severity={librarySyncStatus.running ? 'info' : librarySyncStatus.failed > 0 ? 'warning' : 'success'}>
+            后台同步：{librarySyncStatus.processed}/{librarySyncStatus.total} 本 · 已更新{' '}
+            {librarySyncStatus.updated} 本 · 未完成 {librarySyncStatus.failed} 本
+            {librarySyncStatus.currentIsbn ? ` · 当前 ${librarySyncStatus.currentIsbn}` : ''}
           </Alert>
         )}
 

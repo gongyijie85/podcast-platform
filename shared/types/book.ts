@@ -11,6 +11,8 @@ export interface BookMetadata {
   source: 'openlibrary' | 'googlebooks' | 'mock' | 'bookrank';
 }
 
+export type BookMetadataSyncStatus = 'pending' | 'syncing' | 'synced' | 'failed';
+
 export interface FetchMetadataPayload {
   isbns: string[];
 }
@@ -32,6 +34,10 @@ export interface BookLibraryItem extends BookMetadata {
   categoryName?: string | null;
   rank?: number | null;
   queryCount: number;
+  metadataSyncStatus: BookMetadataSyncStatus;
+  metadataSyncAttempts: number;
+  metadataSyncedAt?: string | null;
+  metadataSyncError?: string | null;
   firstSeenAt: string;
   lastSeenAt: string;
 }
@@ -52,6 +58,23 @@ export interface BookRankImportPayload {
 export interface BookRankImportResult {
   imported: number;
   items: BookLibraryItem[];
+}
+
+export interface BookLibrarySyncStatusResult {
+  running: boolean;
+  total: number;
+  processed: number;
+  updated: number;
+  failed: number;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  currentIsbn?: string | null;
+  lastError?: string | null;
+}
+
+export interface BookLibrarySyncStartResult {
+  accepted: boolean;
+  status: BookLibrarySyncStatusResult;
 }
 
 export type BgmCategory = '轻松' | '科技' | '人文' | '纪实';

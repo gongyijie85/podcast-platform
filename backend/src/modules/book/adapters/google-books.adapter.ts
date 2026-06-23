@@ -6,8 +6,9 @@ import type { BookApiAdapter } from './book-api.adapter';
 import type { BookMetadata } from '@shared/book';
 
 /**
- * GoogleBooksAdapter (fallback)
- * - Returns mock data when AZURE/GOOGLE_BOOKS_BASE is unreachable.
+ * GoogleBooksAdapter (fallback).
+ * Generic placeholder books are not returned in production; unresolved ISBNs
+ * should surface as failures so the library is not polluted with fake metadata.
  */
 @Injectable()
 export class GoogleBooksAdapter implements BookApiAdapter {
@@ -40,7 +41,7 @@ export class GoogleBooksAdapter implements BookApiAdapter {
         },
       );
       const vi = resp.data.items?.[0]?.volumeInfo;
-      if (!vi) return this.mockLookup(isbn);
+      if (!vi) return null;
       return {
         isbn,
         title: (vi.title as string) ?? `Untitled (${isbn})`,
@@ -61,7 +62,9 @@ export class GoogleBooksAdapter implements BookApiAdapter {
     }
   }
 
-  private mockLookup(isbn: string): BookMetadata {
+  private mockLookup(isbn: string): BookMetadata | null {
+    if (this.config.get<boolean>('thirdParty.bookMetadata.allowMock') !== true) return null;
+
     const curated: Record<string, BookMetadata> = {
       '9780241662151': {
         isbn,
@@ -75,14 +78,6 @@ export class GoogleBooksAdapter implements BookApiAdapter {
       },
     };
     if (curated[isbn]) return curated[isbn];
-
-    return {
-      isbn,
-      title: `GoogleBooks 占位 (${isbn})`,
-      author: 'Mock Author',
-      coverUrl: `https://placehold.co/200x200?text=GB+${isbn.slice(-4)}`,
-      summary: 'GoogleBooksAdapter 离线 mock 数据。',
-      source: 'mock',
-    };
+    return null;
   }
 }

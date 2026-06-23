@@ -1,6 +1,8 @@
 import { request } from './client';
 import type {
   BookLibraryListResult,
+  BookLibrarySyncStartResult,
+  BookLibrarySyncStatusResult,
   BookMetadata,
   BookRankImportPayload,
   BookRankImportResult,
@@ -28,6 +30,12 @@ export const bookApi = {
   },
   async importBookRank(payload: BookRankImportPayload): Promise<BookRankImportResult> {
     return request<BookRankImportResult>({ method: 'POST', url: '/books/library/import/bookrank', data: payload });
+  },
+  async syncLibrary(): Promise<BookLibrarySyncStartResult> {
+    return request<BookLibrarySyncStartResult>({ method: 'POST', url: '/books/library/sync' });
+  },
+  async getLibrarySyncStatus(): Promise<BookLibrarySyncStatusResult> {
+    return request<BookLibrarySyncStatusResult>({ method: 'GET', url: '/books/library/sync/status' });
   },
   async getJob(jobId: string): Promise<{ status: string }> {
     return request<{ status: string }>({ method: 'GET', url: `/books/metadata/${jobId}` });

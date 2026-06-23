@@ -7,6 +7,7 @@ import type {
   BookLibraryItem,
   BookLibraryListResult,
   BookMetadata,
+  BookMetadataSyncStatus,
   BookRankImportPayload,
   BookRankImportResult,
 } from '@shared/book';
@@ -83,6 +84,42 @@ export class BookLibraryService {
     return { imported: saved.length, items: saved };
   }
 
+  async createPendingSyncItems(isbns: string[], reason = 'metadata_not_found'): Promise<void> {
+    const normalized = Array.from(new Set(isbns.map((isbn) => normalizeIsbn(isbn)).filter(Boolean) as string[]));
+    for (const isbn of normalized) {
+      const existing = await this.prisma.bookLibraryItem.findUnique({ where: { isbn } });
+      if (!existing) {
+        await this.prisma.bookLibraryItem.create({
+          data: {
+            isbn,
+            title: `待同步图书 (${isbn})`,
+            author: '待同步',
+            coverUrl: null,
+            summary: null,
+            publisher: null,
+            publishedDate: null,
+            pageCount: null,
+            source: 'mock',
+            metadataSyncStatus: 'pending',
+            metadataSyncError: reason,
+          },
+        });
+        continue;
+      }
+
+      if (existing.source === 'mock' || existing.metadataSyncStatus !== 'synced') {
+        await this.prisma.bookLibraryItem.update({
+          where: { isbn },
+          data: {
+            metadataSyncStatus: 'pending',
+            metadataSyncError: reason,
+            queryCount: { increment: 1 },
+          },
+        });
+      }
+    }
+  }
+
   private async upsertOne(
     book: BookMetadata | BookRankMappedBook,
     defaults: Partial<Pick<BookLibraryItem, 'category' | 'categoryName' | 'rank'>>,
@@ -93,6 +130,7 @@ export class BookLibraryService {
     const category = 'category' in book ? book.category ?? defaults.category ?? null : defaults.category ?? null;
     const categoryName = 'categoryName' in book ? book.categoryName ?? defaults.categoryName ?? null : defaults.categoryName ?? null;
     const rank = 'rank' in book ? book.rank ?? defaults.rank ?? null : defaults.rank ?? null;
+    const syncStatus = this.initialSyncStatus(book);
 
     if (!existing) {
       const created = await this.prisma.bookLibraryItem.create({
@@ -109,6 +147,9 @@ export class BookLibraryService {
           category,
           categoryName,
           rank,
+          metadataSyncStatus: syncStatus,
+          metadataSyncedAt: syncStatus === 'synced' ? new Date() : null,
+          metadataSyncError: null,
         },
       });
       return this.toDto(created);
@@ -126,6 +167,7 @@ export class BookLibraryService {
         ...this.presentNullableString('publishedDate', book.publishedDate, existing.publishedDate, preserveBookRank),
         ...(book.pageCount && !(preserveBookRank && existing.pageCount) ? { pageCount: book.pageCount } : {}),
         source: this.preferSource(existing.source, book.source),
+        ...this.syncStatusPatch(book),
         ...(category ? { category } : {}),
         ...(categoryName ? { categoryName } : {}),
         ...(rank ? { rank } : {}),
@@ -169,16 +211,22 @@ export class BookLibraryService {
     categoryName: string | null;
     rank: number | null;
     queryCount: number;
+    metadataSyncStatus?: string | null;
+    metadataSyncAttempts?: number | null;
+    metadataSyncedAt?: Date | null;
+    metadataSyncError?: string | null;
     firstSeenAt: Date;
     lastSeenAt: Date;
   }): BookLibraryItem {
+    const genericMock = this.isGenericMockItem(item);
+    const metadataSyncStatus = this.toSyncStatus(item.metadataSyncStatus, item, genericMock);
     return {
       id: item.id,
       isbn: item.isbn,
-      title: item.title,
-      author: item.author,
+      title: genericMock ? `待同步图书 (${item.isbn})` : item.title,
+      author: genericMock ? '待同步' : item.author,
       coverUrl: item.coverUrl,
-      summary: item.summary,
+      summary: genericMock ? null : item.summary,
       publisher: item.publisher,
       publishedDate: item.publishedDate,
       pageCount: item.pageCount,
@@ -187,6 +235,10 @@ export class BookLibraryService {
       categoryName: item.categoryName,
       rank: item.rank,
       queryCount: item.queryCount,
+      metadataSyncStatus,
+      metadataSyncAttempts: item.metadataSyncAttempts ?? 0,
+      metadataSyncedAt: item.metadataSyncedAt?.toISOString() ?? null,
+      metadataSyncError: item.metadataSyncError ?? null,
       firstSeenAt: item.firstSeenAt.toISOString(),
       lastSeenAt: item.lastSeenAt.toISOString(),
     };
@@ -202,6 +254,44 @@ export class BookLibraryService {
     if (incoming === 'bookrank') return incoming;
     if (existing === 'mock' && incoming !== 'mock') return incoming;
     return existing;
+  }
+
+  private initialSyncStatus(book: BookMetadata | BookRankMappedBook): BookMetadataSyncStatus {
+    if (book.source === 'mock') return 'pending';
+    return this.cleanNullable(book.summary) ? 'synced' : 'pending';
+  }
+
+  private syncStatusPatch(book: BookMetadata | BookRankMappedBook): Record<string, unknown> {
+    const syncStatus = this.initialSyncStatus(book);
+    if (syncStatus === 'synced') {
+      return {
+        metadataSyncStatus: 'synced',
+        metadataSyncedAt: new Date(),
+        metadataSyncError: null,
+      };
+    }
+    if (book.source === 'mock') {
+      return { metadataSyncStatus: 'pending' };
+    }
+    return {};
+  }
+
+  private toSyncStatus(
+    value: string | null | undefined,
+    item: { source: string; summary: string | null },
+    genericMock: boolean,
+  ): BookMetadataSyncStatus {
+    if (value === 'pending' || value === 'syncing' || value === 'synced' || value === 'failed') return value;
+    if (genericMock || item.source === 'mock' || !item.summary) return 'pending';
+    return 'synced';
+  }
+
+  private isGenericMockItem(item: { source: string; title: string; summary: string | null }): boolean {
+    return (
+      item.source === 'mock' &&
+      (item.title.startsWith('GoogleBooks 占位') ||
+        item.summary?.trim() === 'GoogleBooksAdapter 离线 mock 数据。')
+    );
   }
 
   private presentString(field: 'title' | 'author', value: string, existing: string): Record<string, string> {

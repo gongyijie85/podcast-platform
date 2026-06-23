@@ -3,14 +3,15 @@ import { GoogleBooksAdapter } from '../src/modules/book/adapters/google-books.ad
 import { BookRankAdapter } from '../src/modules/book/adapters/bookrank.adapter';
 import { ConfigService } from '@nestjs/config';
 
-const cfg = (): ConfigService =>
+const cfg = (allowMock = true): ConfigService =>
   ({
     get: (k: string) => {
-      const map: Record<string, string> = {
+      const map: Record<string, string | boolean> = {
         'thirdParty.openLibrary.base': 'https://openlibrary.invalid',
         'thirdParty.googleBooks.base': 'https://googleapis.invalid',
         'thirdParty.googleBooks.apiKey': 'test-google-key',
         'thirdParty.bookRank.base': 'https://bookrank.example',
+        'thirdParty.bookMetadata.allowMock': allowMock,
       };
       return map[k];
     },
@@ -47,9 +48,15 @@ describe('Book adapters (mock fallback)', () => {
     ).toContain('moral courage');
   });
 
-  it('GoogleBooksAdapter returns mock when network fails', async () => {
+  it('GoogleBooksAdapter returns null for unknown ISBNs instead of generic placeholders', async () => {
     const a = new GoogleBooksAdapter(cfg());
     const r = await a.fetchByIsbn('9999999999999');
+    expect(r).toBeNull();
+  });
+
+  it('GoogleBooksAdapter can still return curated mock data when mock is explicitly enabled', async () => {
+    const a = new GoogleBooksAdapter(cfg(true));
+    const r = await a.fetchByIsbn('9780241662151');
     expect(r).not.toBeNull();
     expect(r!.source).toBe('mock');
   });
@@ -61,6 +68,12 @@ describe('Book adapters (mock fallback)', () => {
     expect(r!.title).toBe('The Creative Act: A Way of Being');
     expect(r!.author).toBe('Rick Rubin');
     expect(r!.source).toBe('mock');
+  });
+
+  it('GoogleBooksAdapter returns null instead of generic placeholders when mock is disabled', async () => {
+    const a = new GoogleBooksAdapter(cfg(false));
+    const r = await a.fetchByIsbn('9999999999999');
+    expect(r).toBeNull();
   });
 
   it('GoogleBooksAdapter sends the configured API key and maps descriptions to summaries', async () => {

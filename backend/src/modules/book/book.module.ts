@@ -5,12 +5,20 @@ import { OpenLibraryAdapter } from './adapters/open-library.adapter';
 import { GoogleBooksAdapter } from './adapters/google-books.adapter';
 import { BookRankAdapter } from './adapters/bookrank.adapter';
 import { BookLibraryService } from './book-library.service';
+import { BookLibrarySyncService } from './book-library-sync.service';
 import { QueueModule } from '../queue/queue.module';
 
 @Module({
   imports: [forwardRef(() => QueueModule)],
-  providers: [BookService, BookLibraryService, OpenLibraryAdapter, GoogleBooksAdapter, BookRankAdapter],
+  providers: [
+    BookService,
+    BookLibraryService,
+    BookLibrarySyncService,
+    OpenLibraryAdapter,
+    GoogleBooksAdapter,
+    BookRankAdapter,
+  ],
   controllers: [BookController],
-  exports: [BookService, BookLibraryService, OpenLibraryAdapter, GoogleBooksAdapter],
+  exports: [BookService, BookLibraryService, BookLibrarySyncService, OpenLibraryAdapter, GoogleBooksAdapter],
 })
 export class BookModule {}

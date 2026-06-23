@@ -51,4 +51,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD wget -qO- http://127.0.0.1:3001/api/health || exit 1
 
 ENTRYPOINT ["tini", "--"]
-CMD ["node", "dist/backend/src/main.js"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/backend/src/main.js"]

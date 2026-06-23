@@ -76,6 +76,9 @@ export const configuration = () => ({
     bookRank: {
       base: process.env.BOOKRANK_API_BASE_URL || 'https://bookrank-ckml.onrender.com',
     },
+    bookMetadata: {
+      allowMock: process.env.BOOK_METADATA_ALLOW_MOCK === 'true',
+    },
   },
   limits: {
     maxBooks: parseInt(process.env.MAX_BOOKS_PER_PROJECT || '20', 10),

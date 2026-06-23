@@ -22,12 +22,14 @@ describe('BookService metadata resolution', () => {
   const library = {
     findByIsbns: jest.fn(),
     upsertMany: jest.fn(),
+    createPendingSyncItems: jest.fn(),
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
     library.findByIsbns.mockResolvedValue([]);
     library.upsertMany.mockResolvedValue([]);
+    library.createPendingSyncItems.mockResolvedValue(undefined);
   });
 
   it('keeps input order, falls back to Google Books, and adds podcast angles', async () => {
@@ -67,6 +69,34 @@ describe('BookService metadata resolution', () => {
 
     expect(result.ok).toEqual([]);
     expect(result.failed).toEqual(['bad-isbn', '9787121362200']);
+  });
+
+  it('creates pending library sync items for unresolved valid ISBNs', async () => {
+    openLibrary.fetchByIsbn.mockResolvedValueOnce(null);
+    googleBooks.fetchByIsbn.mockResolvedValueOnce(null);
+
+    const service = new BookService(openLibrary as never, googleBooks as never, library as never);
+    const result = await service.fetchBatch(['9787121362200']);
+
+    expect(result.failed).toEqual(['9787121362200']);
+    expect(library.createPendingSyncItems).toHaveBeenCalledWith(['9787121362200']);
+  });
+
+  it('treats generic mock placeholders as unresolved metadata', async () => {
+    openLibrary.fetchByIsbn.mockResolvedValueOnce(null);
+    googleBooks.fetchByIsbn.mockResolvedValueOnce({
+      isbn: '9780000000002',
+      title: 'GoogleBooks 占位 (9780000000002)',
+      author: 'Mock Author',
+      summary: 'GoogleBooksAdapter 离线 mock 数据。',
+      source: 'mock',
+    } satisfies BookMetadata);
+
+    const service = new BookService(openLibrary as never, googleBooks as never);
+    const result = await service.fetchBatch(['9780000000002']);
+
+    expect(result.ok).toEqual([]);
+    expect(result.failed).toEqual(['9780000000002']);
   });
 
   it('resolves 20-book batches with bounded concurrency while preserving input order', async () => {

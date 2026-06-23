@@ -106,11 +106,16 @@ model BookLibraryItem {
   categoryName  String?  @map("category_name")
   rank          Int?
   queryCount    Int      @default(1) @map("query_count")
+  metadataSyncStatus String @default("pending") @map("metadata_sync_status")
+  metadataSyncAttempts Int @default(0) @map("metadata_sync_attempts")
+  metadataSyncedAt DateTime? @map("metadata_synced_at")
+  metadataSyncError String? @db.Text @map("metadata_sync_error")
   firstSeenAt   DateTime @default(now()) @map("first_seen_at")
   lastSeenAt    DateTime @updatedAt @map("last_seen_at")
 
   @@index([source])
   @@index([category])
+  @@index([metadataSyncStatus])
   @@index([lastSeenAt])
   @@map("book_library_items")
 }

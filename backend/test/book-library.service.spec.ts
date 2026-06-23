@@ -109,6 +109,23 @@ describe('BookLibraryService', () => {
     });
   });
 
+  it('creates clean pending sync records for unresolved ISBNs', async () => {
+    await service().createPendingSyncItems(['9781785989117']);
+
+    const item = rows.get('9781785989117');
+
+    expect(item).toMatchObject({
+      isbn: '9781785989117',
+      title: '待同步图书 (9781785989117)',
+      author: '待同步',
+      summary: null,
+      source: 'mock',
+      metadataSyncStatus: 'pending',
+      metadataSyncError: 'metadata_not_found',
+    });
+    expect(item.summary).not.toBe('GoogleBooksAdapter 离线 mock 数据。');
+  });
+
   it('does not overwrite an existing BookRank summary with other metadata sources', async () => {
     await service().upsertMany([
       {

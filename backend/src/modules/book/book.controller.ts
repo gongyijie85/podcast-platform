@@ -2,15 +2,23 @@ import { Body, Controller, Get, Inject, Param, Post, Query, forwardRef } from '@
 import { BookService } from './book.service';
 import { BookRankImportDto, FetchMetadataDto, ResolveMetadataDto } from './dto/fetch-metadata.dto';
 import { BookLibraryService } from './book-library.service';
+import { BookLibrarySyncService } from './book-library-sync.service';
 import { Public } from '../auth/public.decorator';
 import { QueueService } from '../queue/queue.service';
-import type { BookLibraryListResult, BookRankImportResult, ResolveMetadataResult } from '@shared/book';
+import type {
+  BookLibraryListResult,
+  BookLibrarySyncStartResult,
+  BookLibrarySyncStatusResult,
+  BookRankImportResult,
+  ResolveMetadataResult,
+} from '@shared/book';
 
 @Controller()
 export class BookController {
   constructor(
     private readonly books: BookService,
     private readonly library: BookLibraryService,
+    private readonly librarySync: BookLibrarySyncService,
     @Inject(forwardRef(() => QueueService))
     private readonly queues: QueueService,
   ) {}
@@ -54,6 +62,18 @@ export class BookController {
   @Post('books/library/import/bookrank')
   async importBookRank(@Body() dto: BookRankImportDto): Promise<BookRankImportResult> {
     return this.library.importFromBookRank(dto);
+  }
+
+  @Public()
+  @Post('books/library/sync')
+  async syncLibrary(): Promise<BookLibrarySyncStartResult> {
+    return this.librarySync.start();
+  }
+
+  @Public()
+  @Get('books/library/sync/status')
+  async getLibrarySyncStatus(): Promise<BookLibrarySyncStatusResult> {
+    return this.librarySync.getStatus();
   }
 
   @Public()

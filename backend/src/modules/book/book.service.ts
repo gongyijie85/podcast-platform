@@ -57,6 +57,9 @@ export class BookService {
 
       await reportProgress();
 
+      if (meta && this.isGenericMockMetadata(meta)) {
+        return { index, failed: isbn };
+      }
       if (meta) return { index, meta: this.withPodcastAngle(meta) };
       return { index, failed: isbn };
     });
@@ -69,9 +72,16 @@ export class BookService {
       });
     }
 
+    const failed = results.flatMap((result) => (result.failed ? [result.failed] : []));
+    if (failed.length > 0 && this.library) {
+      await this.library.createPendingSyncItems(failed).catch((e) => {
+        this.logger.warn(`Failed to create pending book library metadata: ${(e as Error).message}`);
+      });
+    }
+
     return {
       ok,
-      failed: results.flatMap((result) => (result.failed ? [result.failed] : [])),
+      failed,
     };
   }
 
@@ -128,6 +138,14 @@ export class BookService {
   private shouldUseCachedMetadata(meta: BookMetadata): boolean {
     if (meta.source === 'mock') return false;
     return Boolean(meta.title?.trim() && meta.author?.trim() && this.hasSummary(meta));
+  }
+
+  private isGenericMockMetadata(meta: BookMetadata): boolean {
+    return (
+      meta.source === 'mock' &&
+      (meta.title.startsWith('GoogleBooks 占位') ||
+        meta.summary?.trim() === 'GoogleBooksAdapter 离线 mock 数据。')
+    );
   }
 
   private withPodcastAngle(meta: BookMetadata): BookMetadata {
