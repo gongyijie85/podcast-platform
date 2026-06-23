@@ -233,7 +233,7 @@ export class BookLibraryService {
       isbn: item.isbn,
       title: genericMock ? `待同步图书 (${item.isbn})` : item.title,
       author: genericMock ? '待同步' : item.author,
-      coverUrl: genericMock ? null : item.coverUrl,
+      coverUrl: genericMock || this.isPlaceholderCover(item.coverUrl) ? null : item.coverUrl,
       summary: genericMock ? null : item.summary,
       publisher: item.publisher,
       publishedDate: item.publishedDate,
@@ -324,6 +324,10 @@ export class BookLibraryService {
         item.title.startsWith('待同步图书') ||
         item.summary?.trim() === 'GoogleBooksAdapter 离线 mock 数据。')
     );
+  }
+
+  private isPlaceholderCover(value: string | null | undefined): boolean {
+    return Boolean(value && /\/\/placehold\.co\//i.test(value));
   }
 
   private presentString(field: 'title' | 'author', value: string, existing: string): Record<string, string> {

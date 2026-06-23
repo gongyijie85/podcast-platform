@@ -150,8 +150,30 @@ describe('BookLibraryService', () => {
         firstSeenAt: now,
         lastSeenAt: now,
       },
+      {
+        id: 'lib-partial',
+        isbn: '9780593233528',
+        title: 'Sibley Backyard Birding Puzzle',
+        author: 'David Sibley',
+        coverUrl: 'https://placehold.co/200x200?text=GB+3528',
+        summary: 'Open Library 目录信息显示：Sibley Backyard Birding Puzzle。',
+        publisher: 'Potter',
+        publishedDate: '2020',
+        pageCount: null,
+        source: 'openlibrary',
+        category: null,
+        categoryName: null,
+        rank: null,
+        queryCount: 4,
+        metadataSyncStatus: 'partial',
+        metadataSyncAttempts: 5,
+        metadataSyncedAt: now,
+        metadataSyncError: 'summary_not_found',
+        firstSeenAt: now,
+        lastSeenAt: now,
+      },
     ]);
-    prisma.bookLibraryItem.count.mockResolvedValueOnce(1);
+    prisma.bookLibraryItem.count.mockResolvedValueOnce(2);
 
     const result = await service().list({ syncStatus: 'incomplete' });
 
@@ -166,6 +188,11 @@ describe('BookLibraryService', () => {
       title: '待同步图书 (2191000101991)',
       coverUrl: null,
       metadataSyncStatus: 'failed',
+    });
+    expect(result.items[1]).toMatchObject({
+      title: 'Sibley Backyard Birding Puzzle',
+      coverUrl: null,
+      metadataSyncStatus: 'partial',
     });
   });
 

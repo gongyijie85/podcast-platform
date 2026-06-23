@@ -460,7 +460,8 @@ describe('page experience improvements', () => {
     fireEvent.click(screen.getByLabelText('选择 测试书 1'));
     fireEvent.click(screen.getByLabelText('选择 测试书 2'));
 
-    expect(screen.getByText(/已选 2 本，用于确定本期播客内容/)).toBeInTheDocument();
+    expect(screen.getByText('已选 2 本')).toBeInTheDocument();
+    expect(screen.getByText('将按选择顺序进入本期播客内容。')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '用选中书籍创建播客' }));
 
     expect(await screen.findByText(/target search:/)).toHaveTextContent(

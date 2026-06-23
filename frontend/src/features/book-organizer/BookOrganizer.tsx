@@ -5,6 +5,7 @@ import {
   Button,
   Chip,
   Divider,
+  LinearProgress,
   Pagination,
   Paper,
   Stack,
@@ -48,6 +49,24 @@ const BOOKRANK_CATEGORIES = [
   { value: 'combined-print-and-e-book-nonfiction', label: '综合非虚构' },
   { value: 'business-books', label: '商业图书' },
   { value: 'advice-how-to-and-miscellaneous', label: '建议/方法' },
+];
+
+const SOURCE_FILTER_OPTIONS = [
+  { value: '', label: '全部来源' },
+  { value: 'bookrank', label: 'BookRank' },
+  { value: 'openlibrary', label: 'Open Library' },
+  { value: 'googlebooks', label: 'Google Books' },
+  { value: 'mock', label: '待同步/Mock' },
+];
+
+const SYNC_FILTER_OPTIONS: Array<{ value: BookLibrarySyncStatusFilter | ''; label: string }> = [
+  { value: '', label: '全部状态' },
+  { value: 'incomplete', label: '未完成' },
+  { value: 'synced', label: '完整同步' },
+  { value: 'partial', label: '基础信息待补' },
+  { value: 'failed', label: '同步失败' },
+  { value: 'pending', label: '待同步' },
+  { value: 'syncing', label: '同步中' },
 ];
 
 type ViewMode = 'library' | 'search';
@@ -150,6 +169,27 @@ export function BookOrganizer({
   const [importing, setImporting] = useState(false);
 
   const selectedList = useMemo(() => Array.from(selectedBooks.values()), [selectedBooks]);
+  const sourceLabel = SOURCE_FILTER_OPTIONS.find((option) => option.value === librarySource)?.label;
+  const syncFilterLabel = SYNC_FILTER_OPTIONS.find((option) => option.value === librarySyncFilter)?.label;
+  const categoryLabel =
+    libraryCategory === 'new-books'
+      ? '新书'
+      : BOOKRANK_CATEGORIES.find((category) => category.value === libraryCategory)?.label;
+  const activeLibraryFilters = useMemo(
+    () =>
+      [
+        libraryQuery ? { key: 'q', label: `关键词：${libraryQuery}` } : null,
+        librarySource ? { key: 'source', label: `来源：${sourceLabel ?? librarySource}` } : null,
+        libraryCategory ? { key: 'category', label: `分类：${categoryLabel ?? libraryCategory}` } : null,
+        librarySyncFilter ? { key: 'syncStatus', label: `状态：${syncFilterLabel ?? librarySyncFilter}` } : null,
+      ].filter(Boolean) as Array<{ key: 'q' | 'source' | 'category' | 'syncStatus'; label: string }>,
+    [categoryLabel, libraryCategory, libraryQuery, librarySource, librarySyncFilter, sourceLabel, syncFilterLabel],
+  );
+  const hasLibraryFilters = activeLibraryFilters.length > 0;
+  const syncProgress =
+    librarySyncStatus && librarySyncStatus.total > 0
+      ? Math.round((librarySyncStatus.processed / librarySyncStatus.total) * 100)
+      : 0;
 
   const loadLibrary = useCallback(
     async (pageOverride?: number): Promise<void> => {
@@ -407,6 +447,36 @@ export function BookOrganizer({
     setLibraryQuery(librarySearchText.trim());
   };
 
+  const updateLibrarySource = (value: string): void => {
+    setLibrarySource(value);
+    setLibraryPage(1);
+    setView('library');
+  };
+
+  const updateLibraryCategory = (value: string): void => {
+    setLibraryCategory(value);
+    setLibraryPage(1);
+    setView('library');
+  };
+
+  const updateLibrarySyncFilter = (value: BookLibrarySyncStatusFilter | ''): void => {
+    setLibrarySyncFilter(value);
+    setLibraryPage(1);
+    setView('library');
+  };
+
+  const removeLibraryFilter = (key: 'q' | 'source' | 'category' | 'syncStatus'): void => {
+    if (key === 'q') {
+      setLibrarySearchText('');
+      setLibraryQuery('');
+    }
+    if (key === 'source') setLibrarySource('');
+    if (key === 'category') setLibraryCategory('');
+    if (key === 'syncStatus') setLibrarySyncFilter('');
+    setLibraryPage(1);
+    setView('library');
+  };
+
   const clearLibraryFilters = (): void => {
     setLibrarySearchText('');
     setLibraryQuery('');
@@ -619,6 +689,9 @@ export function BookOrganizer({
                     size="small"
                     value={librarySearchText}
                     onChange={(event) => setLibrarySearchText(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') applyLibraryFilters();
+                    }}
                     placeholder="书名、作者、ISBN、简介"
                     inputProps={{ 'aria-label': 'filter library books' }}
                     InputProps={{
@@ -631,22 +704,22 @@ export function BookOrganizer({
                     size="small"
                     label="来源"
                     value={librarySource}
-                    onChange={(event) => setLibrarySource(event.target.value)}
+                    onChange={(event) => updateLibrarySource(event.target.value)}
                     SelectProps={{ native: true }}
                     sx={{ minWidth: 140 }}
                   >
-                    <option value="">全部来源</option>
-                    <option value="bookrank">BookRank</option>
-                    <option value="openlibrary">Open Library</option>
-                    <option value="googlebooks">Google Books</option>
-                    <option value="mock">Mock</option>
+                    {SOURCE_FILTER_OPTIONS.map((option) => (
+                      <option key={option.value || 'all'} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </TextField>
                   <TextField
                     select
                     size="small"
                     label="分类"
                     value={libraryCategory}
-                    onChange={(event) => setLibraryCategory(event.target.value)}
+                    onChange={(event) => updateLibraryCategory(event.target.value)}
                     SelectProps={{ native: true }}
                     sx={{ minWidth: 160 }}
                   >
@@ -664,18 +737,16 @@ export function BookOrganizer({
                     label="同步状态"
                     value={librarySyncFilter}
                     onChange={(event) =>
-                      setLibrarySyncFilter(event.target.value as BookLibrarySyncStatusFilter | '')
+                      updateLibrarySyncFilter(event.target.value as BookLibrarySyncStatusFilter | '')
                     }
                     SelectProps={{ native: true }}
                     sx={{ minWidth: 150 }}
                   >
-                    <option value="">全部状态</option>
-                    <option value="incomplete">未完成</option>
-                    <option value="synced">完整同步</option>
-                    <option value="partial">基础信息待补</option>
-                    <option value="failed">同步失败</option>
-                    <option value="pending">待同步</option>
-                    <option value="syncing">同步中</option>
+                    {SYNC_FILTER_OPTIONS.map((option) => (
+                      <option key={option.value || 'all'} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </TextField>
                   <Button
                     startIcon={<SearchIcon />}
@@ -704,6 +775,44 @@ export function BookOrganizer({
                     {librarySyncStatus?.running ? '同步中' : '静默同步'}
                   </Button>
                 </Stack>
+                <Stack direction="row" spacing={0.75} sx={{ mt: 1.25, flexWrap: 'wrap', gap: 0.75 }}>
+                  {SYNC_FILTER_OPTIONS.slice(1, 5).map((option) => {
+                    const active = librarySyncFilter === option.value;
+                    return (
+                      <Chip
+                        key={option.value}
+                        size="small"
+                        label={option.label}
+                        color={active ? 'primary' : option.value === 'failed' ? 'error' : 'default'}
+                        variant={active ? 'filled' : 'outlined'}
+                        onClick={() => updateLibrarySyncFilter(option.value)}
+                        sx={{ bgcolor: active ? undefined : 'background.paper' }}
+                      />
+                    );
+                  })}
+                </Stack>
+                {activeLibraryFilters.length > 0 && (
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    alignItems="center"
+                    sx={{ mt: 1.25, flexWrap: 'wrap', gap: 0.75 }}
+                  >
+                    <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                      当前筛选
+                    </Typography>
+                    {activeLibraryFilters.map((filter) => (
+                      <Chip
+                        key={filter.key}
+                        size="small"
+                        label={filter.label}
+                        onDelete={() => removeLibraryFilter(filter.key)}
+                        variant="filled"
+                        sx={{ bgcolor: '#e2e8f0', color: '#0f172a' }}
+                      />
+                    ))}
+                  </Stack>
+                )}
               </Box>
 
               <Box
@@ -827,11 +936,41 @@ export function BookOrganizer({
                   : 'success'
             }
           >
-            后台同步：{librarySyncStatus.processed}/{librarySyncStatus.total} 本 · 已更新{' '}
-            {librarySyncStatus.updated} 本
-            {librarySyncStatus.partial ? ` · 基础信息 ${librarySyncStatus.partial} 本` : ''}
-            {' '}· 未完成 {librarySyncStatus.failed} 本
-            {librarySyncStatus.currentIsbn ? ` · 当前 ${librarySyncStatus.currentIsbn}` : ''}
+            <Stack spacing={0.75}>
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={0.75}
+                alignItems={{ sm: 'center' }}
+                justifyContent="space-between"
+              >
+                <Typography variant="body2" fontWeight={800}>
+                  后台同步：{librarySyncStatus.processed}/{librarySyncStatus.total} 本
+                  {librarySyncStatus.currentIsbn ? ` · 当前 ${librarySyncStatus.currentIsbn}` : ''}
+                </Typography>
+                <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', gap: 0.75 }}>
+                  <Chip size="small" color="success" label={`完整 ${librarySyncStatus.updated} 本`} />
+                  <Chip
+                    size="small"
+                    color="info"
+                    variant="outlined"
+                    label={`基础信息 ${librarySyncStatus.partial ?? 0} 本`}
+                  />
+                  <Chip
+                    size="small"
+                    color={librarySyncStatus.failed > 0 ? 'warning' : 'default'}
+                    variant="outlined"
+                    label={`未完成 ${librarySyncStatus.failed} 本`}
+                  />
+                </Stack>
+              </Stack>
+              {librarySyncStatus.running && librarySyncStatus.total > 0 && (
+                <LinearProgress
+                  variant="determinate"
+                  value={syncProgress}
+                  sx={{ height: 6, borderRadius: 1, bgcolor: 'rgba(15, 23, 42, 0.08)' }}
+                />
+              )}
+            </Stack>
           </Alert>
         )}
 
@@ -859,8 +998,12 @@ export function BookOrganizer({
               <Loading fullScreen label={libraryLoadingLabel} />
             ) : libraryItems.length === 0 ? (
               <Empty
-                title="陈列库暂无图书"
-                description="可以先批量搜索 ISBN，或从 BookRank 导入畅销榜图书"
+                title={hasLibraryFilters ? '没有匹配的图书' : '陈列库暂无图书'}
+                description={
+                  hasLibraryFilters
+                    ? '调整关键词、来源、分类或同步状态后再试'
+                    : '可以先批量搜索 ISBN，或从 BookRank 导入畅销榜图书'
+                }
               />
             ) : (
               <Stack spacing={2}>
@@ -875,7 +1018,8 @@ export function BookOrganizer({
                       公共陈列库 · 共 {libraryTotal} 本 · 第 {libraryPage}/{libraryTotalPages} 页
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      当前显示 {libraryStart}-{libraryEnd}，卡片包含书名、作者和真实图书简介。
+                      当前显示 {libraryStart}-{libraryEnd}
+                      {hasLibraryFilters ? '，已按当前筛选收窄结果。' : '，卡片包含书名、作者和真实图书简介。'}
                     </Typography>
                   </Box>
                 </Stack>
@@ -1011,16 +1155,24 @@ export function BookOrganizer({
         alignItems={{ md: 'center' }}
         justifyContent="space-between"
         sx={{
-          p: 1.25,
+          p: { xs: 1.25, md: 1.5 },
           border: 1,
-          borderColor: 'divider',
+          borderColor: selectedList.length > 0 ? 'primary.light' : 'divider',
           borderRadius: 1,
-          bgcolor: 'action.hover',
+          bgcolor: selectedList.length > 0 ? 'rgba(99, 102, 241, 0.06)' : 'action.hover',
         }}
       >
-        <Typography variant="body2" color="text.secondary">
-          已选 {selectedList.length} 本，用于确定本期播客内容。
-        </Typography>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+          <Chip
+            size="small"
+            color={selectedList.length > 0 ? 'primary' : 'default'}
+            label={`已选 ${selectedList.length} 本`}
+            variant={selectedList.length > 0 ? 'filled' : 'outlined'}
+          />
+          <Typography variant="body2" color="text.secondary">
+            {selectedList.length > 0 ? '将按选择顺序进入本期播客内容。' : '勾选图书后可批量创建播客。'}
+          </Typography>
+        </Stack>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
           <Button
             size="small"
