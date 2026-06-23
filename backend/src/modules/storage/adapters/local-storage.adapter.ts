@@ -16,9 +16,9 @@ export class LocalStorageAdapter implements StorageAdapter {
   private publicBase: string;
 
   constructor(private readonly config: ConfigService) {
-    this.root = path.resolve(process.cwd(), 'storage');
+    const local = this.config.get<{ root?: string }>('storage.local');
+    this.root = path.resolve(process.cwd(), local?.root || 'storage');
     this.publicBase = '/storage';
-    void this.config;
   }
 
   async put(key: string, body: Buffer): Promise<void> {

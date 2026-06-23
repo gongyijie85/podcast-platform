@@ -1,5 +1,6 @@
 // Centralized configuration. All env vars go through here.
 const redisUrl = process.env.REDIS_URL ? new URL(process.env.REDIS_URL) : null;
+const hasExternalStorageConfig = Boolean(process.env.MINIO_ENDPOINT || process.env.OSS_BUCKET);
 
 const parseIntEnv = (value: string | undefined, fallback: number): number => {
   const parsed = parseInt(value || '', 10);
@@ -34,7 +35,10 @@ export const configuration = () => ({
     enqueueTimeoutMs: parseIntEnv(process.env.QUEUE_ENQUEUE_TIMEOUT_MS, 3000),
   },
   storage: {
-    driver: (process.env.STORAGE_DRIVER || 'minio') as 'minio' | 'oss' | 'local',
+    driver: (process.env.STORAGE_DRIVER || (hasExternalStorageConfig ? 'minio' : 'local')) as 'minio' | 'oss' | 'local',
+    local: {
+      root: process.env.LOCAL_STORAGE_ROOT || 'storage',
+    },
     minio: {
       endpoint: process.env.MINIO_ENDPOINT || 'localhost',
       port: parseInt(process.env.MINIO_PORT || '9000', 10),
