@@ -382,6 +382,22 @@ describe('page experience improvements', () => {
     expect(screen.queryByText('GoogleBooksAdapter 离线 mock 数据。')).not.toBeInTheDocument();
   });
 
+  it('filters the shared library by metadata sync status', async () => {
+    render(<BookSearch />, { wrapper: MemoryRouter });
+
+    expect(await screen.findByText('陈列库暂无图书')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('同步状态'), { target: { value: 'partial' } });
+    fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+
+    await waitFor(() =>
+      expect(mocks.listLibrary).toHaveBeenLastCalledWith(expect.objectContaining({
+        page: 1,
+        pageSize: 10,
+        syncStatus: 'partial',
+      })),
+    );
+  });
+
   it('retries the shared book library when the backend is waking up', async () => {
     mocks.listLibrary.mockReset();
     mocks.listLibrary

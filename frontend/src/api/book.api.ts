@@ -2,6 +2,7 @@ import { request } from './client';
 import type {
   BookLibraryListResult,
   BookLibrarySyncStartResult,
+  BookLibrarySyncStatusFilter,
   BookLibrarySyncStatusResult,
   BookMetadata,
   BookRankImportPayload,
@@ -25,6 +26,7 @@ export const bookApi = {
     q?: string;
     source?: string;
     category?: string;
+    syncStatus?: BookLibrarySyncStatusFilter;
   } = {}): Promise<BookLibraryListResult> {
     return request<BookLibraryListResult>({ method: 'GET', url: '/books/library', params });
   },

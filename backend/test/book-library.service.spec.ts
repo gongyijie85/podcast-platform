@@ -126,6 +126,49 @@ describe('BookLibraryService', () => {
     expect(item.summary).not.toBe('GoogleBooksAdapter 离线 mock 数据。');
   });
 
+  it('filters library items by sync status and hides generic mock covers', async () => {
+    prisma.bookLibraryItem.findMany.mockResolvedValueOnce([
+      {
+        id: 'lib-failed',
+        isbn: '2191000101991',
+        title: '待同步图书 (2191000101991)',
+        author: '待同步',
+        coverUrl: 'https://placehold.co/200x200?text=GB+1991',
+        summary: null,
+        publisher: null,
+        publishedDate: null,
+        pageCount: null,
+        source: 'mock',
+        category: null,
+        categoryName: null,
+        rank: null,
+        queryCount: 3,
+        metadataSyncStatus: 'failed',
+        metadataSyncAttempts: 3,
+        metadataSyncedAt: null,
+        metadataSyncError: 'metadata_not_found',
+        firstSeenAt: now,
+        lastSeenAt: now,
+      },
+    ]);
+    prisma.bookLibraryItem.count.mockResolvedValueOnce(1);
+
+    const result = await service().list({ syncStatus: 'incomplete' });
+
+    expect(prisma.bookLibraryItem.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        AND: [
+          { metadataSyncStatus: { in: ['pending', 'syncing', 'partial', 'failed'] } },
+        ],
+      },
+    }));
+    expect(result.items[0]).toMatchObject({
+      title: '待同步图书 (2191000101991)',
+      coverUrl: null,
+      metadataSyncStatus: 'failed',
+    });
+  });
+
   it('does not overwrite an existing BookRank summary with other metadata sources', async () => {
     await service().upsertMany([
       {

@@ -48,6 +48,7 @@ export class BookController {
     @Query('q') q?: string,
     @Query('source') source?: string,
     @Query('category') category?: string,
+    @Query('syncStatus') syncStatus?: string,
   ): Promise<BookLibraryListResult> {
     return this.library.list({
       page: page ? Number(page) : undefined,
@@ -55,6 +56,7 @@ export class BookController {
       q,
       source,
       category,
+      syncStatus,
     });
   }
 

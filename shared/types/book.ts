@@ -12,6 +12,7 @@ export interface BookMetadata {
 }
 
 export type BookMetadataSyncStatus = 'pending' | 'syncing' | 'synced' | 'partial' | 'failed';
+export type BookLibrarySyncStatusFilter = BookMetadataSyncStatus | 'incomplete';
 
 export interface FetchMetadataPayload {
   isbns: string[];

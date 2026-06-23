@@ -30,6 +30,7 @@ import { useUiStore } from '../../store/ui.store';
 import { normalizeIsbn } from '../../utils/isbn';
 import type {
   BookLibraryItem,
+  BookLibrarySyncStatusFilter,
   BookLibrarySyncStatusResult,
   BookMetadata,
   BookRankImportPayload,
@@ -124,6 +125,7 @@ export function BookOrganizer({
   const [libraryQuery, setLibraryQuery] = useState('');
   const [librarySource, setLibrarySource] = useState('');
   const [libraryCategory, setLibraryCategory] = useState('');
+  const [librarySyncFilter, setLibrarySyncFilter] = useState<BookLibrarySyncStatusFilter | ''>('');
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [libraryLoadingLabel, setLibraryLoadingLabel] = useState('正在加载图书陈列库');
   const [libraryError, setLibraryError] = useState<string | null>(null);
@@ -167,6 +169,7 @@ export function BookOrganizer({
               q: libraryQuery || undefined,
               source: librarySource || undefined,
               category: libraryCategory || undefined,
+              syncStatus: librarySyncFilter || undefined,
             });
             setLibraryItems(response.items);
             setLibraryTotal(response.total);
@@ -190,7 +193,7 @@ export function BookOrganizer({
         setLibraryLoadingLabel('正在加载图书陈列库');
       }
     },
-    [libraryCategory, libraryPage, libraryQuery, librarySource],
+    [libraryCategory, libraryPage, libraryQuery, librarySource, librarySyncFilter],
   );
 
   useEffect(() => {
@@ -409,6 +412,7 @@ export function BookOrganizer({
     setLibraryQuery('');
     setLibrarySource('');
     setLibraryCategory('');
+    setLibrarySyncFilter('');
     setLibraryPage(1);
     setView('library');
   };
@@ -653,6 +657,25 @@ export function BookOrganizer({
                         {category.label}
                       </option>
                     ))}
+                  </TextField>
+                  <TextField
+                    select
+                    size="small"
+                    label="同步状态"
+                    value={librarySyncFilter}
+                    onChange={(event) =>
+                      setLibrarySyncFilter(event.target.value as BookLibrarySyncStatusFilter | '')
+                    }
+                    SelectProps={{ native: true }}
+                    sx={{ minWidth: 150 }}
+                  >
+                    <option value="">全部状态</option>
+                    <option value="incomplete">未完成</option>
+                    <option value="synced">完整同步</option>
+                    <option value="partial">基础信息待补</option>
+                    <option value="failed">同步失败</option>
+                    <option value="pending">待同步</option>
+                    <option value="syncing">同步中</option>
                   </TextField>
                   <Button
                     startIcon={<SearchIcon />}

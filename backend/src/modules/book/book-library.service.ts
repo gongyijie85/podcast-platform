@@ -6,6 +6,7 @@ import { normalizeIsbn } from '../../common/utils/isbn';
 import type {
   BookLibraryItem,
   BookLibraryListResult,
+  BookLibrarySyncStatusFilter,
   BookMetadata,
   BookMetadataSyncStatus,
   BookRankImportPayload,
@@ -18,6 +19,7 @@ interface LibraryListOptions {
   q?: string;
   source?: string;
   category?: string;
+  syncStatus?: string;
 }
 
 @Injectable()
@@ -193,6 +195,12 @@ export class BookLibraryService {
     }
     if (options.source?.trim()) and.push({ source: options.source.trim() });
     if (options.category?.trim()) and.push({ category: options.category.trim() });
+    const syncStatus = this.toSyncStatusFilter(options.syncStatus);
+    if (syncStatus === 'incomplete') {
+      and.push({ metadataSyncStatus: { in: ['pending', 'syncing', 'partial', 'failed'] } });
+    } else if (syncStatus) {
+      and.push({ metadataSyncStatus: syncStatus });
+    }
     return and.length > 0 ? { AND: and } : {};
   }
 
@@ -225,7 +233,7 @@ export class BookLibraryService {
       isbn: item.isbn,
       title: genericMock ? `待同步图书 (${item.isbn})` : item.title,
       author: genericMock ? '待同步' : item.author,
-      coverUrl: item.coverUrl,
+      coverUrl: genericMock ? null : item.coverUrl,
       summary: genericMock ? null : item.summary,
       publisher: item.publisher,
       publishedDate: item.publishedDate,
@@ -248,6 +256,20 @@ export class BookLibraryService {
     return value === 'openlibrary' || value === 'googlebooks' || value === 'mock' || value === 'bookrank'
       ? value
       : 'mock';
+  }
+
+  private toSyncStatusFilter(value: string | null | undefined): BookLibrarySyncStatusFilter | null {
+    if (
+      value === 'pending' ||
+      value === 'syncing' ||
+      value === 'synced' ||
+      value === 'partial' ||
+      value === 'failed' ||
+      value === 'incomplete'
+    ) {
+      return value;
+    }
+    return null;
   }
 
   private preferSource(existing: string, incoming: BookMetadata['source']): string {
@@ -299,6 +321,7 @@ export class BookLibraryService {
     return (
       item.source === 'mock' &&
       (item.title.startsWith('GoogleBooks 占位') ||
+        item.title.startsWith('待同步图书') ||
         item.summary?.trim() === 'GoogleBooksAdapter 离线 mock 数据。')
     );
   }
