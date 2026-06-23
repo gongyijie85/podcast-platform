@@ -126,7 +126,11 @@ export class BookService {
 
   private hasFullSummary(meta: BookMetadata): boolean {
     const summary = meta.summary?.replace(/\s+/g, ' ').trim();
-    return Boolean(summary && !summary.startsWith('Open Library 目录信息显示：'));
+    return Boolean(
+      summary &&
+        summary !== 'GoogleBooksAdapter 离线 mock 数据。' &&
+        !summary.startsWith('Open Library 目录信息显示：'),
+    );
   }
 
   private async loadCachedMetadata(isbns: string[]): Promise<Map<string, BookMetadata>> {
@@ -145,15 +149,15 @@ export class BookService {
   }
 
   private shouldUseCachedMetadata(meta: BookMetadata): boolean {
-    if (meta.source === 'mock') return false;
+    if (this.isGenericMockMetadata(meta)) return false;
     return Boolean(meta.title?.trim() && meta.author?.trim());
   }
 
   private isGenericMockMetadata(meta: BookMetadata): boolean {
     return (
-      meta.source === 'mock' &&
-      (meta.title.startsWith('GoogleBooks 占位') ||
-        meta.summary?.trim() === 'GoogleBooksAdapter 离线 mock 数据。')
+      meta.source === 'mock' ||
+      meta.title.startsWith('GoogleBooks 占位') ||
+      meta.summary?.trim() === 'GoogleBooksAdapter 离线 mock 数据。'
     );
   }
 

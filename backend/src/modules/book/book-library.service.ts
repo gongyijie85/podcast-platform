@@ -227,14 +227,15 @@ export class BookLibraryService {
     lastSeenAt: Date;
   }): BookLibraryItem {
     const genericMock = this.isGenericMockItem(item);
-    const metadataSyncStatus = this.toSyncStatus(item.metadataSyncStatus, item, genericMock);
+    const summary = this.isGenericSummary(item.summary) ? null : item.summary;
+    const metadataSyncStatus = this.toSyncStatus(item.metadataSyncStatus, { ...item, summary }, genericMock);
     return {
       id: item.id,
       isbn: item.isbn,
       title: genericMock ? `待同步图书 (${item.isbn})` : item.title,
       author: genericMock ? '待同步' : item.author,
       coverUrl: genericMock || this.isPlaceholderCover(item.coverUrl) ? null : item.coverUrl,
-      summary: genericMock ? null : item.summary,
+      summary: genericMock ? null : summary,
       publisher: item.publisher,
       publishedDate: item.publishedDate,
       pageCount: item.pageCount,
@@ -322,8 +323,12 @@ export class BookLibraryService {
       item.source === 'mock' &&
       (item.title.startsWith('GoogleBooks 占位') ||
         item.title.startsWith('待同步图书') ||
-        item.summary?.trim() === 'GoogleBooksAdapter 离线 mock 数据。')
+        this.isGenericSummary(item.summary))
     );
+  }
+
+  private isGenericSummary(value: string | null | undefined): boolean {
+    return value?.trim() === 'GoogleBooksAdapter 离线 mock 数据。';
   }
 
   private isPlaceholderCover(value: string | null | undefined): boolean {
@@ -340,8 +345,11 @@ export class BookLibraryService {
     value: string | null | undefined,
     existing: string | null,
     preserveExisting = false,
-  ): Record<string, string> {
+  ): Record<string, string | null> {
     const clean = this.cleanNullable(value);
+    if (field === 'summary' && (this.isGenericSummary(value) || (!clean && this.isGenericSummary(existing)))) {
+      return { summary: null };
+    }
     if (preserveExisting && existing) return {};
     return clean && clean !== existing ? { [field]: clean } : {};
   }
@@ -353,7 +361,7 @@ export class BookLibraryService {
 
   private hasFullSummary(value: string | null | undefined): boolean {
     const text = this.cleanNullable(value);
-    return Boolean(text && !text.startsWith('Open Library 目录信息显示：'));
+    return Boolean(text && !this.isGenericSummary(text) && !text.startsWith('Open Library 目录信息显示：'));
   }
 
   private clampInt(value: unknown, min: number, max: number, fallback: number): number {

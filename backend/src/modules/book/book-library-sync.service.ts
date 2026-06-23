@@ -120,7 +120,7 @@ export class BookLibrarySyncService {
 
       const hasFullSummary = this.hasFullSummary(meta);
       const metadataSyncStatus = hasFullSummary ? 'synced' : 'partial';
-      const previousSummary = this.isGenericMockItem(item) ? null : item.summary;
+      const previousSummary = this.isGenericMockItem(item) || this.isGenericSummary(item.summary) ? null : item.summary;
       await this.prisma.bookLibraryItem.update({
         where: { id: item.id },
         data: {
@@ -188,7 +188,8 @@ export class BookLibrarySyncService {
   }
 
   private hasUsableSummary(meta: BookMetadata): boolean {
-    return Boolean(meta.summary?.replace(/\s+/g, ' ').trim());
+    const summary = meta.summary?.replace(/\s+/g, ' ').trim();
+    return Boolean(summary && !this.isGenericSummary(summary));
   }
 
   private hasFullSummary(meta: BookMetadata): boolean {
@@ -199,6 +200,7 @@ export class BookLibrarySyncService {
     const title = this.clean(meta.title);
     const author = this.clean(meta.author);
     if (!title || title.startsWith('Untitled') || title.startsWith('GoogleBooks 占位')) return false;
+    if (meta.source !== 'mock') return true;
     if (author && author !== 'Unknown' && author !== '待同步') return true;
     return Boolean(meta.coverUrl || meta.publisher || meta.publishedDate || meta.pageCount);
   }
@@ -206,7 +208,7 @@ export class BookLibrarySyncService {
   private isGenericMock(meta: BookMetadata): boolean {
     return (
       meta.title.startsWith('GoogleBooks 占位') ||
-      meta.summary?.trim() === 'GoogleBooksAdapter 离线 mock 数据。'
+      this.isGenericSummary(meta.summary)
     );
   }
 
@@ -215,8 +217,12 @@ export class BookLibrarySyncService {
       item.source === 'mock' &&
       (item.title.startsWith('GoogleBooks 占位') ||
         item.title.startsWith('待同步图书') ||
-        item.summary?.trim() === 'GoogleBooksAdapter 离线 mock 数据。')
+        this.isGenericSummary(item.summary))
     );
+  }
+
+  private isGenericSummary(summary: string | null | undefined): boolean {
+    return summary?.trim() === 'GoogleBooksAdapter 离线 mock 数据。';
   }
 
   private isCatalogDerivedSummary(summary: string | null | undefined): boolean {

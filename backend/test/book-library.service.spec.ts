@@ -196,6 +196,43 @@ describe('BookLibraryService', () => {
     });
   });
 
+  it('strips legacy mock summaries from real source records', async () => {
+    prisma.bookLibraryItem.findMany.mockResolvedValueOnce([
+      {
+        id: 'lib-title-only',
+        isbn: '9780385547475',
+        title: 'Power Play',
+        author: 'Unknown',
+        coverUrl: null,
+        summary: 'GoogleBooksAdapter 离线 mock 数据。',
+        publisher: null,
+        publishedDate: null,
+        pageCount: null,
+        source: 'openlibrary',
+        category: null,
+        categoryName: null,
+        rank: null,
+        queryCount: 2,
+        metadataSyncStatus: 'partial',
+        metadataSyncAttempts: 6,
+        metadataSyncedAt: now,
+        metadataSyncError: 'summary_not_found',
+        firstSeenAt: now,
+        lastSeenAt: now,
+      },
+    ]);
+    prisma.bookLibraryItem.count.mockResolvedValueOnce(1);
+
+    const result = await service().list({ q: 'Power Play' });
+
+    expect(result.items[0]).toMatchObject({
+      title: 'Power Play',
+      source: 'openlibrary',
+      summary: null,
+      metadataSyncStatus: 'partial',
+    });
+  });
+
   it('does not overwrite an existing BookRank summary with other metadata sources', async () => {
     await service().upsertMany([
       {

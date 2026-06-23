@@ -142,4 +142,68 @@ describe('BookLibrarySyncService', () => {
       failed: 0,
     });
   });
+
+  it('keeps title-only Open Library records as partial instead of failed', async () => {
+    const row = {
+      id: 'lib-title-only',
+      isbn: '9780385547475',
+      title: '待同步图书 (9780385547475)',
+      author: '待同步',
+      coverUrl: null,
+      summary: 'GoogleBooksAdapter 离线 mock 数据。',
+      publisher: null,
+      publishedDate: null,
+      pageCount: null,
+      source: 'mock',
+      category: null,
+      categoryName: null,
+      rank: null,
+      queryCount: 1,
+      metadataSyncStatus: 'failed',
+      metadataSyncAttempts: 5,
+      metadataSyncedAt: null,
+      metadataSyncError: 'metadata_not_found',
+      firstSeenAt: new Date('2026-06-22T00:00:00.000Z'),
+      lastSeenAt: new Date('2026-06-22T00:00:00.000Z'),
+    };
+    const prisma = {
+      bookLibraryItem: {
+        findMany: jest.fn().mockResolvedValue([row]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const openLibrary = {
+      fetchByIsbn: jest.fn().mockResolvedValue({
+        isbn: '9780385547475',
+        title: 'Power Play',
+        author: 'Unknown',
+        coverUrl: null,
+        summary: null,
+        publisher: null,
+        publishedDate: null,
+        pageCount: null,
+        source: 'openlibrary',
+      } satisfies BookMetadata),
+    };
+    const googleBooks = { fetchByIsbn: jest.fn().mockResolvedValue(null) };
+
+    const service = new BookLibrarySyncService(prisma as never, openLibrary as never, googleBooks as never);
+    service.start();
+
+    await waitUntil(() => !service.getStatus().running);
+
+    expect(prisma.bookLibraryItem.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'lib-title-only' },
+      data: expect.objectContaining({
+        title: 'Power Play',
+        author: 'Unknown',
+        summary: null,
+        source: 'openlibrary',
+        metadataSyncStatus: 'partial',
+        metadataSyncError: 'summary_not_found',
+      }),
+    }));
+    expect(service.getStatus()).toMatchObject({ processed: 1, updated: 0, partial: 1, failed: 0 });
+  });
 });
