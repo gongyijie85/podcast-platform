@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useProjectStore } from '../store/project.store';
+import { useAuthStore } from '../store/auth.store';
 
 const mocks = vi.hoisted(() => ({
   fetchMetadata: vi.fn(),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   syncLibrary: vi.fn(),
   getLibrarySyncStatus: vi.fn(),
   createProject: vi.fn(),
+  listProjects: vi.fn(),
   generateProject: vi.fn(),
   regenerateProject: vi.fn(),
   getProject: vi.fn(),
@@ -29,6 +31,11 @@ vi.mock('react-i18next', () => ({
         'bookSearch.title': '图书搜索',
         'bookSearch.noResults': '没有结果',
         'book.fetching': '正在抓取',
+        'dashboard.title': '仪表盘',
+        'dashboard.welcome': '欢迎回来，访客',
+        'dashboard.noProjects': '还没有项目',
+        'dashboard.newProject': '新建项目',
+        'app.tagline': 'ISBN → 一键生成双人对话播客',
         'projectCreate.title': '新建项目',
         'projectCreate.segmentMode': '分段模式',
         'projectCreate.scriptMode': '脚本模式',
@@ -112,6 +119,7 @@ vi.mock('../api/book.api', () => ({
 vi.mock('../api/project.api', () => ({
   projectApi: {
     create: mocks.createProject,
+    list: mocks.listProjects,
     generate: mocks.generateProject,
     regenerate: mocks.regenerateProject,
     get: mocks.getProject,
@@ -139,6 +147,7 @@ vi.mock('../api/tts.api', () => ({
 }));
 
 import { BookSearch } from '../pages/BookSearch';
+import { Dashboard } from '../pages/Dashboard';
 import { ProjectCreate } from '../pages/ProjectCreate';
 import { ProjectDetail } from '../pages/ProjectDetail';
 
@@ -171,10 +180,18 @@ describe('page experience improvements', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useProjectStore.getState().reset();
+    useAuthStore.setState({
+      token: null,
+      user: null,
+      isAuthenticated: false,
+      loading: false,
+      error: null,
+    });
     mocks.useProgress.mockReturnValue({ progress: 0, stage: null, message: '', events: [] });
     mocks.listBgm.mockResolvedValue([]);
     mocks.listVoices.mockResolvedValue([]);
     mocks.createProject.mockResolvedValue(createdProject);
+    mocks.listProjects.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 50 });
     mocks.generateProject.mockResolvedValue({ accepted: true, jobIds: {} });
     mocks.regenerateProject.mockResolvedValue({ accepted: true, jobIds: {}, project: createdProject });
     mocks.getProject.mockResolvedValue(createdProject);
@@ -205,6 +222,14 @@ describe('page experience improvements', () => {
 
     expect(await screen.findByText(/图书信息获取失败：metadata timeout/)).toBeInTheDocument();
     expect(screen.queryByText(/示例书名/)).not.toBeInTheDocument();
+  });
+
+  it('does not request authenticated projects for guest dashboard', async () => {
+    render(<Dashboard />, { wrapper: MemoryRouter });
+
+    expect(await screen.findByText('还没有项目')).toBeInTheDocument();
+    expect(mocks.listProjects).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Missing bearer token/)).not.toBeInTheDocument();
   });
 
   it('shows 20 organized books across 10-item pages with real summary details', async () => {

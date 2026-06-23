@@ -5,6 +5,15 @@ import { localStorageAdapter } from '../storage/local-storage.adapter';
 import type { UserDto } from '@shared/user';
 
 const GUEST_PROJECT_IDS_KEY = 'guest.projectIds';
+const ACCESS_KEY = 'auth.accessToken';
+const REFRESH_KEY = 'auth.refreshToken';
+const USER_KEY = 'auth.user';
+
+const clearStoredAuth = (): void => {
+  localStorageAdapter.remove(ACCESS_KEY);
+  localStorageAdapter.remove(REFRESH_KEY);
+  localStorageAdapter.remove(USER_KEY);
+};
 
 async function syncGuestProjects(): Promise<void> {
   const ids = localStorageAdapter.get<string[]>(GUEST_PROJECT_IDS_KEY) ?? [];
@@ -48,9 +57,14 @@ export const useAuthStore = create<AuthState>((set) => ({
   init: () => {
     const u = authApi.getStoredUser();
     const logged = authApi.isLoggedIn();
-    set({ user: u, isAuthenticated: logged, token: logged ? 'present' : null });
+    if (!logged || !u) {
+      clearStoredAuth();
+      set({ user: null, isAuthenticated: false, token: null });
+      return;
+    }
+    set({ user: u, isAuthenticated: true, token: 'present' });
   },
-  setUser: (u) => set({ user: u, isAuthenticated: !!u }),
+  setUser: (u) => set({ user: u, isAuthenticated: !!u && authApi.isLoggedIn() }),
   clearError: () => set({ error: null }),
   login: async (email, password) => {
     set({ loading: true, error: null });
@@ -66,8 +80,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const msg = e instanceof Error ? e.message : '登录失败';
       set({ error: msg });
       // Clean up any partial state
-      localStorageAdapter.remove('auth.accessToken');
-      localStorageAdapter.remove('auth.refreshToken');
+      clearStoredAuth();
       throw e;
     } finally {
       set({ loading: false });

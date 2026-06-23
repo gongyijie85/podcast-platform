@@ -7,6 +7,7 @@ import type { ApiResponse } from '@shared/api';
 
 const ACCESS_KEY = 'auth.accessToken';
 const REFRESH_KEY = 'auth.refreshToken';
+const USER_KEY = 'auth.user';
 
 let isRefreshing = false;
 let refreshSubscribers: Array<(token: string) => void> = [];
@@ -98,6 +99,7 @@ apiClient.interceptors.response.use(
         isRefreshing = false;
         localStorageAdapter.remove(ACCESS_KEY);
         localStorageAdapter.remove(REFRESH_KEY);
+        localStorageAdapter.remove(USER_KEY);
         logger.warn('refresh failed, redirecting to login', e);
         return Promise.reject(error);
       }

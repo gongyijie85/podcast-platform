@@ -57,6 +57,7 @@ export function Dashboard(): JSX.Element {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const push = useUiStore((s) => s.push);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [activeProject, setActiveProject] = useState<ProjectDto | null>(null);
@@ -65,11 +66,11 @@ export function Dashboard(): JSX.Element {
   // Guests can start a project without loading authenticated history.
   const { data, loading, error, refetch } = useApi(
     () => (
-      user
+      isAuthenticated
         ? projectApi.list(1, 50)
         : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 50 })
     ),
-    [user?.id],
+    [isAuthenticated, user?.id],
   );
 
   useEffect(() => {

@@ -85,6 +85,7 @@ describe('apiClient interceptors', () => {
     // Arrange: valid access token, valid refresh token
     localStorageAdapter.set('auth.accessToken', 'expired-tok');
     localStorageAdapter.set('auth.refreshToken', 'refresh-tok');
+    localStorageAdapter.set('auth.user', { id: 'u-1', email: 'a@b.com' });
     let callCount = 0;
     const adapter = vi.fn(async (config) => {
       callCount += 1;
@@ -113,6 +114,7 @@ describe('apiClient interceptors', () => {
     // Tokens should be cleared after refresh fails
     expect(localStorageAdapter.get('auth.accessToken')).toBeNull();
     expect(localStorageAdapter.get('auth.refreshToken')).toBeNull();
+    expect(localStorageAdapter.get('auth.user')).toBeNull();
   });
 
   it('does not try to refresh on 401 for /auth/* endpoints', async () => {

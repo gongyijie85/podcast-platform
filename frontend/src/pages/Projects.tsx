@@ -31,6 +31,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { projectApi } from '../api/project.api';
 import { useApi } from '../hooks/useApi';
 import { useUiStore } from '../store/ui.store';
+import { useAuthStore } from '../store/auth.store';
 import { Empty } from '../components/common/Empty';
 import { Loading } from '../components/common/Loading';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
@@ -61,12 +62,20 @@ export function Projects(): JSX.Element {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const push = useUiStore((s) => s.push);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState('');
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState<ProjectDto | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ProjectDto | null>(null);
-  const { data, loading, refetch } = useApi(() => projectApi.list(page, PAGE_SIZE), [page]);
+  const { data, loading, refetch } = useApi(
+    () => (
+      isAuthenticated
+        ? projectApi.list(page, PAGE_SIZE)
+        : Promise.resolve({ items: [], total: 0, page, pageSize: PAGE_SIZE })
+    ),
+    [isAuthenticated, page],
+  );
 
   useEffect(() => {
     // when page changes, refetch

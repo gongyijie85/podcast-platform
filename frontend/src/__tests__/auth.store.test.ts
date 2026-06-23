@@ -75,6 +75,18 @@ describe('useAuthStore', () => {
       expect(s.isAuthenticated).toBe(false);
       expect(s.token).toBeNull();
     });
+
+    it('clears stale stored user when access token is missing', () => {
+      mocked.getStoredUser.mockReturnValue(fakeUser);
+      mocked.isLoggedIn.mockReturnValue(false);
+
+      useAuthStore.getState().init();
+
+      const s = useAuthStore.getState();
+      expect(s.user).toBeNull();
+      expect(s.isAuthenticated).toBe(false);
+      expect(s.token).toBeNull();
+    });
   });
 
   describe('login()', () => {
@@ -157,7 +169,8 @@ describe('useAuthStore', () => {
   });
 
   describe('setUser()', () => {
-    it('updates user and isAuthenticated', () => {
+    it('updates user and isAuthenticated when a token is present', () => {
+      mocked.isLoggedIn.mockReturnValue(true);
       useAuthStore.getState().setUser(fakeUser);
       expect(useAuthStore.getState().user).toEqual(fakeUser);
       expect(useAuthStore.getState().isAuthenticated).toBe(true);
