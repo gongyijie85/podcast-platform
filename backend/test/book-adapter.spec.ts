@@ -162,6 +162,59 @@ describe('Book adapters (mock fallback)', () => {
     });
   });
 
+  it('GoogleBooksAdapter prefers exact ISBN matches and fetches detail descriptions', async () => {
+    const a = new GoogleBooksAdapter(cfg());
+    const get = jest
+      .fn()
+      .mockResolvedValueOnce({
+        data: {
+          items: [
+            {
+              id: 'wrong-volume',
+              volumeInfo: {
+                title: 'Wrong Gatsby Edition',
+                authors: ['Someone Else'],
+                description: 'This is a long but wrong description from a non-matching identifier.',
+                industryIdentifiers: [{ type: 'ISBN_13', identifier: '9780000000002' }],
+              },
+            },
+            {
+              id: 'right-volume',
+              volumeInfo: {
+                title: 'The Great Gatsby',
+                authors: ['F. Scott Fitzgerald'],
+                industryIdentifiers: [{ type: 'ISBN_13', identifier: '978-0743273565' }],
+              },
+            },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 'right-volume',
+          volumeInfo: {
+            title: 'The Great Gatsby',
+            subtitle: 'The Authorized Text',
+            authors: ['F. Scott Fitzgerald'],
+            description: '<p>A canonical novel about wealth, longing, class performance, and American illusion.</p>',
+            imageLinks: { thumbnail: 'http://books.google.com/cover.jpg' },
+            industryIdentifiers: [{ type: 'ISBN_13', identifier: '9780743273565' }],
+          },
+        },
+      });
+    (a as unknown as { http: { get: jest.Mock } }).http.get = get;
+
+    const r = await a.fetchByIsbn('9780743273565');
+
+    expect(get).toHaveBeenCalledWith('https://googleapis.invalid/volumes/right-volume', expect.any(Object));
+    expect(r).toMatchObject({
+      title: 'The Great Gatsby: The Authorized Text',
+      author: 'F. Scott Fitzgerald',
+      summary: 'A canonical novel about wealth, longing, class performance, and American illusion.',
+      coverUrl: 'https://books.google.com/cover.jpg',
+    });
+  });
+
   it('BookRankAdapter maps bestseller details, rank, category, and relative covers', async () => {
     const a = new BookRankAdapter(cfg());
     const get = jest.fn().mockResolvedValue({

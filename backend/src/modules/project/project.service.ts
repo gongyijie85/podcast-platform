@@ -66,12 +66,16 @@ export class ProjectService {
       });
     }
 
-    const missingIsbns = normalizedIsbns.filter((isbn): isbn is string => Boolean(isbn && !metadataByIsbn.has(isbn)));
-    if (missingIsbns.length > 0) {
+    const enrichmentIsbns = normalizedIsbns.filter((isbn): isbn is string => {
+      if (!isbn) return false;
+      const existing = metadataByIsbn.get(isbn);
+      return !existing || !this.hasFullSummary(existing);
+    });
+    if (enrichmentIsbns.length > 0) {
       try {
-        const resolved = await this.books.fetchBatch(missingIsbns);
+        const resolved = await this.books.fetchBatch(enrichmentIsbns);
         for (const book of resolved.ok) {
-          metadataByIsbn.set(book.isbn, book);
+          metadataByIsbn.set(book.isbn, this.mergeBookMetadata(metadataByIsbn.get(book.isbn), book));
         }
       } catch {
         // Keep creation available when external metadata APIs are temporarily unavailable.
@@ -502,6 +506,35 @@ export class ProjectService {
 
   private normalizeScriptTemplate(value?: string | null): ScriptTemplate {
     return SCRIPT_TEMPLATES.includes(value as ScriptTemplate) ? (value as ScriptTemplate) : 'default';
+  }
+
+  private mergeBookMetadata(existing: BookMetadata | undefined, incoming: BookMetadata): BookMetadata {
+    if (!existing) return incoming;
+    return {
+      ...existing,
+      title: this.clean(incoming.title) || existing.title,
+      author: this.clean(incoming.author) && incoming.author !== 'Unknown' ? incoming.author : existing.author,
+      coverUrl: incoming.coverUrl ?? existing.coverUrl ?? null,
+      summary: this.hasFullSummary(incoming) ? incoming.summary ?? null : existing.summary ?? incoming.summary ?? null,
+      podcastAngle: incoming.podcastAngle ?? existing.podcastAngle ?? null,
+      publisher: incoming.publisher ?? existing.publisher ?? null,
+      publishedDate: incoming.publishedDate ?? existing.publishedDate ?? null,
+      pageCount: incoming.pageCount ?? existing.pageCount ?? null,
+      source: incoming.source !== 'mock' ? incoming.source : existing.source,
+    };
+  }
+
+  private hasFullSummary(book: BookMetadata): boolean {
+    const summary = this.clean(book.summary);
+    return Boolean(
+      summary &&
+        summary !== 'GoogleBooksAdapter 离线 mock 数据。' &&
+        !summary.startsWith('Open Library 目录信息显示：'),
+    );
+  }
+
+  private clean(value: string | null | undefined): string {
+    return value?.replace(/\s+/g, ' ').trim() ?? '';
   }
 
   private toBookSource(value?: string | null): BookMetadata['source'] {

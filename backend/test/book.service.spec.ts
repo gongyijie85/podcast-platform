@@ -32,30 +32,30 @@ describe('BookService metadata resolution', () => {
     library.createPendingSyncItems.mockResolvedValue(undefined);
   });
 
-  it('keeps input order, falls back to Google Books, and adds podcast angles', async () => {
-    openLibrary.fetchByIsbn
+  it('keeps input order, tries Google Books first, and adds podcast angles', async () => {
+    googleBooks.fetchByIsbn
       .mockResolvedValueOnce({
         isbn: '9787121362200',
         title: '人类简史',
         author: '尤瓦尔·赫拉利',
         summary: '从认知革命到科学革命的宏观回顾。',
-        source: 'openlibrary',
+        source: 'googlebooks',
       } satisfies BookMetadata)
-      .mockResolvedValueOnce(null);
-    googleBooks.fetchByIsbn.mockResolvedValueOnce({
-      isbn: '9787508672069',
-      title: '思考，快与慢',
-      author: '丹尼尔·卡尼曼',
-      summary: '介绍人类两种思维模式。',
-      source: 'googlebooks',
-    } satisfies BookMetadata);
+      .mockResolvedValueOnce({
+        isbn: '9787508672069',
+        title: '思考，快与慢',
+        author: '丹尼尔·卡尼曼',
+        summary: '介绍人类两种思维模式。',
+        source: 'googlebooks',
+      } satisfies BookMetadata);
 
     const service = new BookService(openLibrary as never, googleBooks as never);
     const result = await service.fetchBatch(['9787121362200', '9787508672069']);
 
     expect(result.failed).toEqual([]);
     expect(result.ok.map((b) => b.isbn)).toEqual(['9787121362200', '9787508672069']);
-    expect(result.ok.map((b) => b.source)).toEqual(['openlibrary', 'googlebooks']);
+    expect(result.ok.map((b) => b.source)).toEqual(['googlebooks', 'googlebooks']);
+    expect(openLibrary.fetchByIsbn).not.toHaveBeenCalled();
     expect(result.ok[0]?.podcastAngle).toContain('适合从"人类简史"');
     expect(result.ok[1]?.podcastAngle).toContain('丹尼尔·卡尼曼');
   });
@@ -103,7 +103,7 @@ describe('BookService metadata resolution', () => {
     const isbns = Array.from({ length: 20 }, (_, i) => makeValidIsbn13(i));
     let inFlight = 0;
     let maxInFlight = 0;
-    openLibrary.fetchByIsbn.mockImplementation(async (isbn: string) => {
+    googleBooks.fetchByIsbn.mockImplementation(async (isbn: string) => {
       inFlight += 1;
       maxInFlight = Math.max(maxInFlight, inFlight);
       await new Promise((resolve) => setTimeout(resolve, 5));
@@ -113,7 +113,7 @@ describe('BookService metadata resolution', () => {
         title: `测试书 ${isbn.slice(-2)}`,
         author: '作者',
         summary: '这是一段真实图书简介，用于验证批量解析时无需额外兜底。',
-        source: 'openlibrary',
+        source: 'googlebooks',
       } satisfies BookMetadata;
     });
 
@@ -124,32 +124,32 @@ describe('BookService metadata resolution', () => {
     expect(result.ok.map((book) => book.isbn)).toEqual(isbns);
     expect(maxInFlight).toBeGreaterThan(1);
     expect(maxInFlight).toBeLessThanOrEqual(4);
-    expect(googleBooks.fetchByIsbn).not.toHaveBeenCalled();
+    expect(openLibrary.fetchByIsbn).not.toHaveBeenCalled();
   });
 
-  it('fills missing Open Library summaries from real Google Books descriptions only', async () => {
-    openLibrary.fetchByIsbn
+  it('fills missing Google Books summaries from Open Library only when Open Library has a real summary', async () => {
+    googleBooks.fetchByIsbn
       .mockResolvedValueOnce({
         isbn: '9780000000002',
         title: '没有简介的书',
         author: '作者甲',
         summary: null,
-        source: 'openlibrary',
+        source: 'googlebooks',
       } satisfies BookMetadata)
       .mockResolvedValueOnce({
         isbn: '9780000000019',
         title: '不能用占位简介的书',
         author: '作者乙',
         summary: null,
-        source: 'openlibrary',
+        source: 'googlebooks',
       } satisfies BookMetadata);
-    googleBooks.fetchByIsbn
+    openLibrary.fetchByIsbn
       .mockResolvedValueOnce({
         isbn: '9780000000002',
         title: '没有简介的书',
         author: '作者甲',
-        summary: '这是一段来自 Google Books 的真实图书简介。',
-        source: 'googlebooks',
+        summary: '这是一段来自 Open Library 的真实图书简介。',
+        source: 'openlibrary',
       } satisfies BookMetadata)
       .mockResolvedValueOnce({
         isbn: '9780000000019',
@@ -162,8 +162,36 @@ describe('BookService metadata resolution', () => {
     const service = new BookService(openLibrary as never, googleBooks as never);
     const result = await service.fetchBatch(['9780000000002', '9780000000019']);
 
-    expect(result.ok[0]?.summary).toBe('这是一段来自 Google Books 的真实图书简介。');
+    expect(result.ok[0]?.summary).toBe('这是一段来自 Open Library 的真实图书简介。');
     expect(result.ok[1]?.summary).toBeNull();
+  });
+
+  it('does not stop at cached partial metadata when Google Books can enrich it', async () => {
+    library.findByIsbns.mockResolvedValueOnce([
+      {
+        isbn: '9780743273565',
+        title: 'The Great Gatsby',
+        author: 'F. Scott Fitzgerald',
+        summary: null,
+        source: 'openlibrary',
+      },
+    ]);
+    googleBooks.fetchByIsbn.mockResolvedValueOnce({
+      isbn: '9780743273565',
+      title: 'The Great Gatsby',
+      author: 'F. Scott Fitzgerald',
+      summary: 'A real Google Books description about wealth, longing, and illusion.',
+      source: 'googlebooks',
+    } satisfies BookMetadata);
+
+    const service = new BookService(openLibrary as never, googleBooks as never, library as never);
+    const result = await service.fetchBatch(['9780743273565']);
+
+    expect(googleBooks.fetchByIsbn).toHaveBeenCalledWith('9780743273565');
+    expect(result.ok[0]).toEqual(expect.objectContaining({
+      source: 'googlebooks',
+      summary: 'A real Google Books description about wealth, longing, and illusion.',
+    }));
   });
 
   it('uses cached library metadata with real summaries before external adapters', async () => {

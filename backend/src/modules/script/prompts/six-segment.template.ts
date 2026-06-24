@@ -53,10 +53,15 @@ export const AUDIO_OVERVIEW_BRIEF_USER_TEMPLATE = (
     .map(
       (b, i) =>
         `${i + 1}. ${b.title} - ${b.author}${b.summary ? `\n真实简介：${b.summary.slice(0, 500)}` : ''}${
-          b.podcastAngle ? `\n播客切入点：${b.podcastAngle.slice(0, 220)}` : ''
+      b.podcastAngle ? `\n播客切入点：${b.podcastAngle.slice(0, 220)}` : ''
         }`,
     )
     .join('\n\n')}\n\n请输出格式：{"episodeQuestion":"...","openingPromise":"...","bookRoles":[{"title":"...","role":"..."}],"crossBookAngles":["..."],"listenerTakeaways":["..."],"sourceLimits":["..."]}`;
+
+const coverageGuidance = (books: Array<{ title: string }>): string =>
+  books.length > 10
+    ? `- 本期一共 ${books.length} 本书，属于多书专题。请把书分成 3-5 个主题簇串联，每本书至少用完整书名进入节目主线 1 次，并说明它在主题簇中的角色；不要机械要求每本书重复出现。`
+    : `- 本期一共 ${books.length} 本书，脚本必须覆盖所有书目；每本书至少出现 2 次，并且至少有 1 条台词讲它的核心内容或价值。`;
 
 export const SIX_SEGMENT_USER_TEMPLATE = (
   title: string,
@@ -69,12 +74,12 @@ export const SIX_SEGMENT_USER_TEMPLATE = (
       const podcastAngle = b.podcastAngle ? `\n   播客切入点：${b.podcastAngle.slice(0, 160)}` : '';
       return `${i + 1}. ${b.title} - ${b.author}${summary}${podcastAngle}`;
     })
-    .join('\n')}\n\n节目策划要求：\n- 本期一共 ${books.length} 本书，脚本必须覆盖所有书目；每本书至少出现 2 次，并且至少有 1 条台词讲它的核心内容或价值。\n- 如果有多本书，不要做流水账书单。请先提出一个总问题，再比较这些书怎样从不同角度回答这个问题。\n- introduce 段：交代每本书的作者、主题和为什么放在同一期，不要只报书单。\n- interpret 段：做真正解读，至少包含 2 个跨书对照点，并让主持人追问"这和另一本书有什么关系"。\n- review 段：给出判断，不只夸赞，也指出局限、争议或时代背景。\n- suggest 段：告诉听众先读哪本、带着什么问题读、适合什么人。\n- closing 段：用 2-3 句话收束所有书的共同意义。\n- 书名必须逐字沿用上方参考书目的 title，不能把一个英文词替换成意思相近的另一个词；带副标题或括号的书，首次提及时使用完整书名，后续可以简称。\n- 少用感叹词和附和词；不要连续出现"对/没错/嗯"。\n- 禁止虚构未提供的情节、奖项、销量、作者背景或行业评价；如果简介不足，请用"从已知信息看"这类边界表达。\n\n请严格按六段式输出 JSON 对象：{"segments":[{"speaker":"host","text":"...","emotion":"开心","stage":"intro"}]}。`;
+    .join('\n')}\n\n节目策划要求：\n${coverageGuidance(books)}\n- 如果有多本书，不要做流水账书单。请先提出一个总问题，再比较这些书怎样从不同角度回答这个问题。\n- introduce 段：交代每本书的作者、主题和为什么放在同一期，不要只报书单。\n- interpret 段：做真正解读，至少包含 2 个跨书对照点，并让主持人追问"这和另一本书有什么关系"。\n- review 段：给出判断，不只夸赞，也指出局限、争议或时代背景。\n- suggest 段：告诉听众先读哪本、带着什么问题读、适合什么人。\n- closing 段：用 2-3 句话收束所有书的共同意义。\n- 大批量书目时优先做主题分组和代表性对照，控制整体在 10-14 条高信息密度台词内，避免逐本流水账。\n- 书名必须逐字沿用上方参考书目的 title，不能把一个英文词替换成意思相近的另一个词；带副标题或括号的书，首次提及时使用完整书名，后续可以简称。\n- 少用感叹词和附和词；不要连续出现"对/没错/嗯"。\n- 禁止虚构未提供的情节、奖项、销量、作者背景或行业评价；如果简介不足，请用"从已知信息看"这类边界表达。\n\n请严格按六段式输出 JSON 对象：{"segments":[{"speaker":"host","text":"...","emotion":"开心","stage":"intro"}]}。`;
 
 export const MERGE_MODE_SYSTEM_PROMPT = `你是播客脚本作家，需要把多本书融合到一期播客中。
 要求：
-1. 每本书作为一个"章"，章首有 30-50 字引子，章末有 20-30 字过渡
-2. 每章内部按：介绍 → 解读 → 评价 → 建议 四段组成
+1. 少量书目时可按书推进；大批量书目时必须按主题簇推进，避免逐本流水账
+2. 内容按：总问题 → 主题分组 → 跨书比较 → 阅读建议 → 收束观点组成
 3. 整体 2500-4500 字
 4. 每条台词必须有 speaker、text、emotion、stage 字段
 5. 情绪限定：开心 | 沉思 | 激昂 | 平缓 | 温柔 | 幽默 | 坚定 | 紧张

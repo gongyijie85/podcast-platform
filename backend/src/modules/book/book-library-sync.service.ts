@@ -162,21 +162,21 @@ export class BookLibrarySyncService {
   }
 
   private async resolveRealMetadata(isbn: string): Promise<BookMetadata | null> {
-    let meta = await this.openLibrary.fetchByIsbn(isbn);
+    let meta = await this.googleBooks.fetchByIsbn(isbn);
     if (meta && !this.hasFullSummary(meta)) {
-      const google = await this.googleBooks.fetchByIsbn(isbn);
-      if (google && google.source !== 'mock' && !this.isGenericMock(google) && this.hasFullSummary(google)) {
+      const open = await this.openLibrary.fetchByIsbn(isbn);
+      if (open && open.source !== 'mock' && !this.isGenericMock(open) && this.hasFullSummary(open)) {
         meta = {
           ...meta,
-          coverUrl: meta.coverUrl ?? google.coverUrl ?? null,
-          publisher: meta.publisher ?? google.publisher ?? null,
-          publishedDate: meta.publishedDate ?? google.publishedDate ?? null,
-          pageCount: meta.pageCount ?? google.pageCount ?? null,
-          summary: google.summary,
+          coverUrl: meta.coverUrl ?? open.coverUrl ?? null,
+          publisher: meta.publisher ?? open.publisher ?? null,
+          publishedDate: meta.publishedDate ?? open.publishedDate ?? null,
+          pageCount: meta.pageCount ?? open.pageCount ?? null,
+          summary: open.summary,
         };
       }
     }
-    if (!meta) meta = await this.googleBooks.fetchByIsbn(isbn);
+    if (!meta) meta = await this.openLibrary.fetchByIsbn(isbn);
     if (!meta || meta.source === 'mock' || this.isGenericMock(meta)) return null;
     return this.hasUsableIdentity(meta) ? meta : null;
   }

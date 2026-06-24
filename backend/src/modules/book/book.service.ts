@@ -17,8 +17,8 @@ export class BookService {
   ) {}
 
   /**
-   * Try OpenLibrary first, fall back to GoogleBooks.
-   * `onProgress(done, total)` is called after each ISBN completes.
+   * Try Google Books first for richer descriptions/covers, then fall back to
+   * Open Library. `onProgress(done, total)` is called after each ISBN completes.
    */
   async fetchBatch(
     isbns: string[],
@@ -44,16 +44,12 @@ export class BookService {
       }
 
       const cached = cachedByIsbn.get(isbn);
-      if (cached) {
+      if (cached && this.shouldUseCachedCompleteMetadata(cached)) {
         await reportProgress();
         return { index, meta: this.withPodcastAngle(cached) };
       }
 
-      let meta = await this.openLibrary.fetchByIsbn(isbn);
-      if (meta && !this.hasFullSummary(meta)) {
-        meta = await this.withGoogleBooksSummary(meta, isbn);
-      }
-      if (!meta) meta = await this.googleBooks.fetchByIsbn(isbn);
+      const meta = await this.resolveFreshMetadata(isbn, cached);
 
       await reportProgress();
 
@@ -107,21 +103,34 @@ export class BookService {
     return results;
   }
 
-  private async withGoogleBooksSummary(meta: BookMetadata, isbn: string): Promise<BookMetadata> {
-    const fallback = await this.googleBooks.fetchByIsbn(isbn);
-    if (!fallback || fallback.source === 'mock' || !this.hasFullSummary(fallback)) return meta;
-    return {
-      ...meta,
-      coverUrl: meta.coverUrl ?? fallback.coverUrl ?? null,
-      publisher: meta.publisher ?? fallback.publisher ?? null,
-      publishedDate: meta.publishedDate ?? fallback.publishedDate ?? null,
-      pageCount: meta.pageCount ?? fallback.pageCount ?? null,
-      summary: fallback.summary,
-    };
+  private async resolveFreshMetadata(isbn: string, cached?: BookMetadata): Promise<BookMetadata | null> {
+    const google = await this.googleBooks.fetchByIsbn(isbn);
+    if (google && !this.isGenericMockMetadata(google)) {
+      if (this.hasFullSummary(google)) return google;
+
+      const open = await this.openLibrary.fetchByIsbn(isbn);
+      if (open && !this.isGenericMockMetadata(open) && this.hasFullSummary(open)) {
+        return this.mergePreferPrimary(google, open);
+      }
+
+      return google;
+    }
+
+    const open = await this.openLibrary.fetchByIsbn(isbn);
+    if (open && !this.isGenericMockMetadata(open)) return open;
+    if (cached && this.shouldUseCachedPartialMetadata(cached)) return cached;
+    return null;
   }
 
-  private hasSummary(meta: BookMetadata): boolean {
-    return Boolean(meta.summary?.replace(/\s+/g, ' ').trim());
+  private mergePreferPrimary(primary: BookMetadata, fallback: BookMetadata): BookMetadata {
+    return {
+      ...primary,
+      coverUrl: primary.coverUrl ?? fallback.coverUrl ?? null,
+      publisher: primary.publisher ?? fallback.publisher ?? null,
+      publishedDate: primary.publishedDate ?? fallback.publishedDate ?? null,
+      pageCount: primary.pageCount ?? fallback.pageCount ?? null,
+      summary: this.hasFullSummary(primary) ? primary.summary : fallback.summary ?? primary.summary ?? null,
+    };
   }
 
   private hasFullSummary(meta: BookMetadata): boolean {
@@ -151,6 +160,15 @@ export class BookService {
   private shouldUseCachedMetadata(meta: BookMetadata): boolean {
     if (this.isGenericMockMetadata(meta)) return false;
     return Boolean(meta.title?.trim() && meta.author?.trim());
+  }
+
+  private shouldUseCachedCompleteMetadata(meta: BookMetadata): boolean {
+    if (!this.shouldUseCachedMetadata(meta)) return false;
+    return meta.source === 'bookrank' || this.hasFullSummary(meta);
+  }
+
+  private shouldUseCachedPartialMetadata(meta: BookMetadata): boolean {
+    return this.shouldUseCachedMetadata(meta);
   }
 
   private isGenericMockMetadata(meta: BookMetadata): boolean {

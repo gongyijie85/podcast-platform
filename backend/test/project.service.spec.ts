@@ -122,6 +122,52 @@ describe('ProjectService create metadata flow', () => {
     }));
   });
 
+  it('enriches provided book metadata when the summary is missing', async () => {
+    bookService.fetchBatch.mockResolvedValueOnce({
+      ok: [
+        {
+          isbn: '9780241662151',
+          title: 'The Creative Act: A Way of Being',
+          author: 'Rick Rubin',
+          coverUrl: 'https://example.com/google-cover.jpg',
+          summary: 'Google Books 提供的真实简介。',
+          publisher: 'Penguin Press',
+          publishedDate: '2023',
+          source: 'googlebooks',
+        } satisfies BookMetadata,
+      ],
+      failed: [],
+    });
+
+    await service().create(null, {
+      ...baseDto,
+      books: [
+        {
+          isbn: '9780241662151',
+          title: 'The Creative Act',
+          author: 'Rick Rubin',
+          summary: null,
+          source: 'openlibrary',
+        },
+      ],
+    });
+
+    expect(bookService.fetchBatch).toHaveBeenCalledWith(['9780241662151']);
+    expect(prisma.project.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        books: {
+          create: [
+            expect.objectContaining({
+              title: 'The Creative Act: A Way of Being',
+              summary: 'Google Books 提供的真实简介。',
+              metadataSource: 'googlebooks',
+            }),
+          ],
+        },
+      }),
+    }));
+  });
+
   it('resolves metadata when only ISBNs are provided', async () => {
     bookService.fetchBatch.mockResolvedValueOnce({
       ok: [
