@@ -40,3 +40,6 @@ frontend/.vite/
 Thumbs.db
 
 .vercel
+
+# 临时 pnpm 缓存目录（本地安装时使用）
+.pnpm-cache/

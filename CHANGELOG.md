@@ -1,6 +1,80 @@
 # 播客平台 CHANGELOG
 
+## [0.3.0] - 2026-06-24
+
+### 修改时间
+- 2026-06-24（上海时间）
+
+### Security（安全修复）
+- 修复 ThrottlerGuard 未注册问题，恢复全局限流（short: 1s/10次, medium: 60s/60次）。在 `auth.module.ts` 注册 `APP_GUARD` 使用 `ThrottlerGuard`，优先于 `JwtAuthGuard` 执行。
+- 修复 `LocalStorageAdapter` 路径遍历漏洞，新增 `resolveSafeKey` 方法校验 key 不得包含 `../`，防止任意文件读写。
+
+### Build（构建修复）
+- Docker 构建改用 `--frozen-lockfile`（backend + frontend），确保依赖版本与 lockfile 一致，防止依赖漂移。
+- 移除 `backend.Dockerfile` 中 `prisma generate || true`，失败即中断构建，不再掩盖错误。
+- Docker runtime 镜像改用 `pnpm install --prod --frozen-lockfile`，不再 COPY builder 的全部 node_modules，镜像体积预计减少约 300MB。
+- 修复 `step3-tts-mix.ts` 生产环境 fixtures 路径断裂：改用 `process.cwd()` 定位，Dockerfile 补充 `COPY --from=builder /app/backend/src/test/fixtures ./src/test/fixtures`。
+
+### Quality（代码质量）
+- 引入 `typescript-eslint` recommended 规则，`eslint.config.js` 不再为空配置。新增 `eslint` 和 `typescript-eslint` 到根 devDependencies。
+
+### 注意事项
+- 本次新增了 `eslint` 和 `typescript-eslint` 依赖，需执行 `pnpm install` 完成安装后 `pnpm lint` 才能生效。
+- Docker 镜像构建方式变更：runtime 阶段单独安装生产依赖，构建时间可能略增，但镜像体积显著减小。
+
 ## [0.2.0] - 2026-06-18
+
+### Smoke Test（本次补充）
+
+- 修改时间：2026-06-18 17:30（上海时间）
+- 执行人：TRAE Agent
+- 测试范围：v0.2.0 质量闭环提交后的本地测试、构建、线上只读检查
+
+#### 本地验证结果
+
+- 后端测试：`pnpm exec jest --config jest.config.ts --runInBand`
+  - 结果：Test Suites 14 passed / 3 skipped；Tests 74 passed / 14 skipped
+  - 状态：通过
+- 前端测试：`pnpm --filter frontend test`
+  - 结果：Test Files 15 passed；Tests 160 passed
+  - 状态：通过
+- 后端构建：`pnpm --filter backend build`
+  - 结果：Nest build passed
+  - 状态：通过
+- 前端构建：`pnpm --filter frontend build`
+  - 结果：`tsc -b && vite build` passed
+  - 状态：通过
+- 本地构建产物静态服务验证：
+  - `vite preview` 后 `http://localhost:5173/` 与 `/book-search` 均返回 200
+  - 状态：通过
+
+#### 线上只读检查结果
+
+- `https://podcast-platform-backend-8065.onrender.com/api/health`：返回 `code: 0`、`status: ok`
+- `https://podcast-platform-backend-8065.onrender.com/api/bgm/tracks`：返回 12 条 BGM 数据，`code: 0`
+- `https://podcast-platform.vercel.app/`：返回 500，`MIDDLEWARE_INVOCATION_FAILED`
+- `https://podcast-platform.vercel.app/book-search`：返回 500，`MIDDLEWARE_INVOCATION_FAILED`
+
+#### 发现的问题
+
+1. **Vercel 线上前端 500 错误**
+   - 现象：根路径和 `/book-search` 均返回 `500 Internal Server Error`，响应头 `X-Vercel-Error: MIDDLEWARE_INVOCATION_FAILED`
+   - 影响：用户无法通过 Vercel 域名访问前端页面
+   - 排查结论：本地构建产物通过 `vite preview` 可正常访问 200，说明前端代码与构建输出本身正常；问题出在 Vercel 平台部署侧
+   - 可能原因：
+     - Vercel 项目 Framework Preset 被错误识别为 Next.js（应为 Vite）
+     - Vercel Dashboard 中残留旧版 Edge Middleware 配置
+     - 部署缓存异常，需要 Redeploy 并关闭 build cache
+   - 建议修复：
+     1. 登录 Vercel Dashboard → 项目 Settings → General → Framework Preset 确认为 `Vite`
+     2. 检查 Functions / Middleware 标签页是否有未清理的中间件
+     3. 在 Deployments 中点击最新部署的 `Redeploy`，勾选 `Use existing Build Cache` 为 No
+     4. 确认环境变量 `VITE_API_BASE_URL=https://podcast-platform-backend-8065.onrender.com` 已设置并重新部署
+
+2. **本地完整 E2E 未能执行**
+   - 原因：本机 Docker Desktop 未运行，且 scoop 安装的 PostgreSQL 数据目录受 TRAE Sandbox 限制无法启动
+   - 影响：未验证真实数据库下的 `auth.e2e-spec.ts`、`full-local.e2e-spec.ts`、`pipeline.e2e-spec.ts`
+   - 缓解：单元测试与集成测试已覆盖核心逻辑；建议部署环境补充完整 E2E
 
 ### Added
 - 新增质量闭环能力：脚本生成返回 `{ segments, episodeBrief }`，`ScriptDto` 新增 `episodeBrief` 与 `qualityReport`。

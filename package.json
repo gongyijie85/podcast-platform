@@ -1,6 +1,6 @@
 {
   "name": "podcast-platform",
-  "version": "1.0.0",
+  "version": "0.3.0",
   "private": true,
   "description": "ISBN -> AI Podcast automated production platform (monorepo root)",
   "scripts": {
@@ -23,5 +23,9 @@
   "packageManager": "pnpm@9.9.0",
   "dependencies": {
     "playwright": "^1.60.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.9.0",
+    "typescript-eslint": "^8.0.0"
   }
 }

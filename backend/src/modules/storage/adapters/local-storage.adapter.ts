@@ -22,19 +22,19 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 
   async put(key: string, body: Buffer): Promise<void> {
-    const full = path.join(this.root, key);
+    const full = this.resolveSafeKey(key);
     await fs.mkdir(path.dirname(full), { recursive: true });
     await fs.writeFile(full, body);
   }
 
   async get(key: string): Promise<Buffer> {
-    const full = path.join(this.root, key);
+    const full = this.resolveSafeKey(key);
     return fs.readFile(full);
   }
 
   async exists(key: string): Promise<boolean> {
     try {
-      await fs.access(path.join(this.root, key));
+      await fs.access(this.resolveSafeKey(key));
       return true;
     } catch {
       return false;
@@ -47,7 +47,7 @@ export class LocalStorageAdapter implements StorageAdapter {
 
   async remove(key: string): Promise<void> {
     try {
-      await fs.unlink(path.join(this.root, key));
+      await fs.unlink(this.resolveSafeKey(key));
     } catch (e) {
       this.logger.warn(`unlink ${key}: ${(e as Error).message}`);
     }
@@ -55,5 +55,18 @@ export class LocalStorageAdapter implements StorageAdapter {
 
   publicUrl(key: string): string {
     return `${this.publicBase}/${key}`;
+  }
+
+  /**
+   * 将 key 解析为 root 内的绝对路径，拒绝路径遍历（如 ../）。
+   * 防止攻击者通过 key 读写 root 之外的任意文件。
+   */
+  private resolveSafeKey(key: string): string {
+    const resolved = path.resolve(this.root, key);
+    // 解析后必须在 root 目录内（或等于 root 本身）
+    if (!resolved.startsWith(this.root + path.sep) && resolved !== this.root) {
+      throw new Error(`Invalid storage key: path traversal detected (${key})`);
+    }
+    return resolved;
   }
 }

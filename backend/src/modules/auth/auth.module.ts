@@ -3,6 +3,7 @@ import { JwtModule, JwtService } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { APP_GUARD, Reflector } from '@nestjs/core';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { UserModule } from '../user/user.module';
@@ -42,6 +43,12 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
   ],
   providers: [
     AuthService,
+    // 限流守卫优先于认证守卫执行：先防滥用，再验身份。
+    // ThrottlerGuard 为 @Injectable()，构造函数依赖由 Nest 自动解析。
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_GUARD,
       inject: [JwtService, ConfigService, Reflector],

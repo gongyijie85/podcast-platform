@@ -8,7 +8,8 @@ COPY frontend/package.json ./frontend/
 COPY shared/package.json ./shared/
 COPY backend/package.json ./backend/
 
-RUN pnpm install --frozen-lockfile=false
+# 使用 frozen-lockfile 确保依赖版本与 lockfile 一致，防止依赖漂移
+RUN pnpm install --frozen-lockfile
 
 COPY frontend ./frontend
 COPY shared ./shared

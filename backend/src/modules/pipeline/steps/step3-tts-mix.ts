@@ -174,14 +174,15 @@ function clamp(n: number, lo: number, hi: number): number {
  * `backend/src/test/fixtures/silence-1s.mp3` path that the existing
  * `MockTtsAdapter` uses so the fallback buffer is byte-identical to a
  * successful TTS call.
+ *
+ * 使用 process.cwd() 定位，确保 dev 和 Docker 生产环境都能找到文件：
+ *  - dev：process.cwd() = backend/，路径 = backend/src/test/fixtures/silence-1s.mp3
+ *  - prod：process.cwd() = /app/，路径 = /app/src/test/fixtures/silence-1s.mp3
+ *    （backend.Dockerfile 中已 COPY fixtures 到该位置）
  */
 async function loadSilenceFallback(): Promise<Buffer> {
   const fixturePath = path.resolve(
-    __dirname,
-    '..',
-    '..',
-    '..',
-    '..',
+    process.cwd(),
     'src',
     'test',
     'fixtures',
