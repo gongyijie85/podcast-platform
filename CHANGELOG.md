@@ -4,6 +4,7 @@
 
 ### 修改时间
 - 2026-06-24（上海时间）
+- 2026-06-25（上海时间）：补齐 ESLint 可执行性收尾
 
 ### Security（安全修复）
 - 修复 ThrottlerGuard 未注册问题，恢复全局限流（short: 1s/10次, medium: 60s/60次）。在 `auth.module.ts` 注册 `APP_GUARD` 使用 `ThrottlerGuard`，优先于 `JwtAuthGuard` 执行。
@@ -17,9 +18,13 @@
 
 ### Quality（代码质量）
 - 引入 `typescript-eslint` recommended 规则，`eslint.config.js` 不再为空配置。新增 `eslint` 和 `typescript-eslint` 到根 devDependencies。
+- 将 ESLint 配置迁移为 `eslint.config.mjs`，避免 Node 解析 ESM 配置时产生 `MODULE_TYPELESS_PACKAGE_JSON` 警告。
+- 新增 `eslint-plugin-react-hooks`，让前端已有的 `react-hooks/exhaustive-deps` 规则指令可被正确识别。
+- 将历史遗留的 `no-explicit-any`、`no-unused-vars`、`no-require-imports` 暂设为 warning，使 `pnpm lint` 可用于 CI 阻断新增 error，同时保留渐进修复清单。
 
 ### 注意事项
-- 本次新增了 `eslint` 和 `typescript-eslint` 依赖，需执行 `pnpm install` 完成安装后 `pnpm lint` 才能生效。
+- 本次新增了 `eslint`、`typescript-eslint` 与 `eslint-plugin-react-hooks` 依赖，需执行 `pnpm install` 后使用 `pnpm lint`。
+- 当前 `pnpm lint` 已能以 exit 0 通过；历史遗留问题会以 warning 输出，后续可逐步收敛为 error。
 - Docker 镜像构建方式变更：runtime 阶段单独安装生产依赖，构建时间可能略增，但镜像体积显著减小。
 
 ## [0.2.0] - 2026-06-18

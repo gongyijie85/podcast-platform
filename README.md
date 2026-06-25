@@ -80,7 +80,7 @@ podcast-platform/
 |------|------|
 | `pnpm dev` | 同时启前后端 dev server |
 | `pnpm build` | 构建前后端 |
-| `pnpm lint` | 运行 ESLint 代码检查（typescript-eslint recommended 规则） |
+| `pnpm lint` | 运行 ESLint 代码检查（typescript-eslint recommended + React Hooks；新增 error 会阻断，历史债务先以 warning 输出） |
 | `pnpm prisma:migrate` | 跑 Prisma migration |
 | `pnpm seed:bgm` | 灌 BGM 12 首种子数据 |
 | `docker compose up -d` | 启全栈 |
@@ -134,4 +134,3 @@ pnpm test:e2e
 ## License
 
 MIT
-
