@@ -1,5 +1,43 @@
 # 播客平台 CHANGELOG
 
+## [0.3.1] - 2026-06-25
+
+### 修改时间
+- 2026-06-25（上海时间）
+
+### Ponytail Audit 清理（代码瘦身）
+
+基于 `ponytail-audit-report.md` 的复核结果，删除冗余代码与无引用文件。
+
+#### Deleted（删除）
+- 后端类型重导出代理层：删除 `backend/src/types/shared/` 下 8 个单行透传文件（含 `pipeline.ts` 66 行手动镜像）。`backend/tsconfig.json` 的 `@shared/*` 路径直接指向 `../shared/types/*`，与 jest 配置统一。
+- `backend/src/modules/script/adapters/doubao.adapter.ts`：空壳转发（仅 1 行 re-export），无任何外部引用。
+- 前端 6 个废弃旧组件（已确认无引用，存在保留方）：
+  - `components/feedback/ErrorBoundary.tsx`（保留 `common/ErrorBoundary`）
+  - `components/editor/ScriptEditor.tsx`（保留 `script/ScriptEditor`）
+  - `components/layout/StepIndicator.tsx`（保留 `progress/StepIndicator`）
+  - `components/layout/AppFooter.tsx`（保留 `Footer`）
+  - `components/layout/AppHeader.tsx`（保留 `Header`）
+  - `features/config/VoiceSelector.tsx`（保留 `tts/VoiceSelector`）
+- `frontend/src/components/feedback/EmptyState.tsx`：未引用的重复实现，保留 `common/Empty.tsx`。
+- `frontend/src/storage/storage.interface.ts`：`KVStorage` 接口仅被自身实现引用，删除并让 `localStorageAdapter` 走 TS 推断。
+
+#### Moved（移动）
+- 4 个根目录 Playwright 调试脚本（`check-deploy.js` / `debug-frontend.js` / `verify-login.js` / `verify-login2.js`）移至 `scripts/`，避免污染项目根目录。
+
+#### Skipped（审计报告建议但未执行）
+- Mock 适配器：复核发现 `pipeline.module.ts` 实际注入 `MockBookMetadataAdapter` / `MockScriptGenAdapter` / `MockTtsAdapter` 作为 fallback，且 `mock-audio.util.ts` 的 `synthesizeMockSilence` 被多个真实 TTS 适配器（azure/volcengine/xiaomi-mimo）使用。属于合法运行时代码，保留。
+- ISBN 校验提取到 `shared/`：`shared` 是 type-only 包（`build: echo 'shared is type-only, no build'`），引入运行时函数会破坏该约定并增加构建配置复杂度。50 行重复代码 < 共享运行时代码的维护成本，跳过。
+
+#### 验证
+- `pnpm --filter backend exec tsc --noEmit` ✅
+- `pnpm --filter frontend exec tsc --noEmit` ✅
+
+#### 净变化
+- 删除：15 个文件（8 后端代理 + 1 doubao + 6 前端废弃组件 + 1 EmptyState + 1 storage 接口）
+- 移动：4 个文件（调试脚本入 `scripts/`）
+- 净减少：~350 行代码
+
 ## [0.3.0] - 2026-06-24
 
 ### 修改时间

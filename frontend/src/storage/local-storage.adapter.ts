@@ -1,8 +1,6 @@
-import type { KVStorage } from './storage.interface';
-
 const NS = 'podcast-platform:';
 
-export const localStorageAdapter: KVStorage = {
+export const localStorageAdapter = {
   get<T>(key: string): T | null {
     try {
       const raw = localStorage.getItem(NS + key);
