@@ -47,6 +47,7 @@ interface Props {
   selectable?: boolean;
   checked?: boolean;
   onToggleSelect?: (b: BookMetadata) => void;
+  useLabel?: string;
 }
 
 /**
@@ -63,6 +64,7 @@ export function BookCard({
   selectable = false,
   checked = false,
   onToggleSelect,
+  useLabel,
 }: Props): JSX.Element {
   const isList = layout === 'list';
   const highlighted = selected || checked;
@@ -291,7 +293,7 @@ export function BookCard({
               onClick={() => onUse(book)}
               sx={{ whiteSpace: 'nowrap', minWidth: 88 }}
             >
-              {selected ? '已选' : '使用此书'}
+              {selected ? '已选' : (useLabel ?? '使用此书')}
             </Button>
           )}
         </Stack>

@@ -39,8 +39,16 @@ export interface BookLibraryItem extends BookMetadata {
   metadataSyncAttempts: number;
   metadataSyncedAt?: string | null;
   metadataSyncError?: string | null;
+  livePitch?: string | null;
+  livePitchGeneratedAt?: string | null;
   firstSeenAt: string;
   lastSeenAt: string;
+}
+
+export interface GenerateLivePitchResult {
+  isbn: string;
+  livePitch: string;
+  generatedAt: string;
 }
 
 export interface BookLibraryListResult {

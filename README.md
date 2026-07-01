@@ -5,7 +5,7 @@
 
 ## 核心能力
 
-- **图书陈列库**：从 BookRank 导入畅销榜图书，管理图书元数据与中文简介。
+- **选书库**：从 BookRank 导入畅销榜图书，管理图书元数据与中文简介，支持主播口播稿（AI 生成 + 手动编辑），为直播带货做准备。
 - **AI 深潜播客**：默认脚本模板为 `audio-overview`，生成专业导读内容。
 - **质量闭环**：脚本生成后自动分析图书覆盖率、台词具体度、跨书比较、口头禅密度，提供质量自检报告与快速返修按钮（更深入、少口头禅、更轻松、缩短到 8 分钟、加强跨书比较）。
 - **BGM 混音**：12 首环境音模板，支持自定义选择与关闭。
@@ -127,6 +127,7 @@ pnpm test:e2e
 | Open Library | `OPENLIBRARY_BASE` 不可达 | 返回 5 本示例书 |
 | Google Books | 同上 | 返回 3 本示例书 |
 | Xiaomi MiMo / Token Plan LLM | `LLM_API_KEY` 为空 | 返回固定双人播客脚本 |
+| LLM 直播口播稿生成 | `LLM_API_KEY` 缺失或调用失败 | 模板化生成 100-200 字口播稿 |
 | BookRank | `BOOKRANK_API_BASE_URL` 不可达 | 导入接口返回错误，不伪造畅销榜数据 |
 | 火山 TTS | `VOLC_TTS_APP_ID` 为空 | 返回 1s 静音 MP3（Buffer） |
 | Azure TTS | `AZURE_TTS_KEY` 为空 | 同上 |

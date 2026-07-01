@@ -1,15 +1,19 @@
-import { Body, Controller, Get, Inject, Param, Post, Query, forwardRef } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Patch, Post, Query, forwardRef } from '@nestjs/common';
 import { BookService } from './book.service';
 import { BookRankImportDto, FetchMetadataDto, ResolveMetadataDto } from './dto/fetch-metadata.dto';
+import { UpdateBookDto } from './dto/update-book.dto';
 import { BookLibraryService } from './book-library.service';
 import { BookLibrarySyncService } from './book-library-sync.service';
+import { LivePitchService } from './live-pitch.service';
 import { Public } from '../auth/public.decorator';
 import { QueueService } from '../queue/queue.service';
 import type {
+  BookLibraryItem,
   BookLibraryListResult,
   BookLibrarySyncStartResult,
   BookLibrarySyncStatusResult,
   BookRankImportResult,
+  GenerateLivePitchResult,
   ResolveMetadataResult,
 } from '@shared/book';
 
@@ -19,6 +23,7 @@ export class BookController {
     private readonly books: BookService,
     private readonly library: BookLibraryService,
     private readonly librarySync: BookLibrarySyncService,
+    private readonly livePitch: LivePitchService,
     @Inject(forwardRef(() => QueueService))
     private readonly queues: QueueService,
   ) {}
@@ -58,6 +63,27 @@ export class BookController {
       category,
       syncStatus,
     });
+  }
+
+  @Public()
+  @Get('books/library/:isbn')
+  async getBookDetail(@Param('isbn') isbn: string): Promise<BookLibraryItem | null> {
+    return this.library.findByIsbn(isbn);
+  }
+
+  @Public()
+  @Patch('books/library/:isbn')
+  async updateBook(
+    @Param('isbn') isbn: string,
+    @Body() dto: UpdateBookDto,
+  ): Promise<BookLibraryItem> {
+    return this.library.updateLivePitch(isbn, dto.livePitch ?? '');
+  }
+
+  @Public()
+  @Post('books/library/:isbn/pitch/generate')
+  async generatePitch(@Param('isbn') isbn: string): Promise<GenerateLivePitchResult> {
+    return this.livePitch.generate(isbn);
   }
 
   @Public()

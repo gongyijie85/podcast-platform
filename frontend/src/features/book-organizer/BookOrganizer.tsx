@@ -126,12 +126,14 @@ interface BookOrganizerProps {
   initialIsbns?: string[];
   onUseBook: (book: BookMetadata) => void;
   onUseBooks?: (books: BookMetadata[]) => void;
+  detailMode?: boolean;
 }
 
 export function BookOrganizer({
   initialIsbns = [],
   onUseBook,
   onUseBooks,
+  detailMode = false,
 }: BookOrganizerProps): JSX.Element {
   const { t } = useTranslation();
   const push = useUiStore((s) => s.push);
@@ -1036,6 +1038,7 @@ export function BookOrganizer({
                       checked={selectedBooks.has(book.isbn)}
                       onToggleSelect={toggleBookSelection}
                       onUse={onUseBook}
+                      useLabel={detailMode ? '查看详情' : undefined}
                     />
                   ))}
                 </Stack>
@@ -1125,6 +1128,7 @@ export function BookOrganizer({
                       checked={selectedBooks.has(book.isbn)}
                       onToggleSelect={toggleBookSelection}
                       onUse={onUseBook}
+                      useLabel={detailMode ? '查看详情' : undefined}
                     />
                   ))}
                 </Stack>
@@ -1190,16 +1194,40 @@ export function BookOrganizer({
           >
             清空选择
           </Button>
-          <Button
-            size="small"
-            variant="contained"
-            startIcon={<PlaylistAddCheckIcon />}
-            onClick={useSelectedBooks}
-            disabled={selectedList.length === 0}
-            sx={{ whiteSpace: 'nowrap' }}
-          >
-            用选中书籍创建播客
-          </Button>
+          {detailMode ? (
+            <>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<PlaylistAddCheckIcon />}
+                onClick={useSelectedBooks}
+                disabled={selectedList.length === 0 || !onUseBooks}
+                sx={{ whiteSpace: 'nowrap' }}
+              >
+                制作播客
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                onClick={() => selectedList[0] && onUseBook(selectedList[0])}
+                disabled={selectedList.length === 0}
+                sx={{ whiteSpace: 'nowrap' }}
+              >
+                查看详情
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<PlaylistAddCheckIcon />}
+              onClick={useSelectedBooks}
+              disabled={selectedList.length === 0}
+              sx={{ whiteSpace: 'nowrap' }}
+            >
+              用选中书籍创建播客
+            </Button>
+          )}
         </Stack>
       </Stack>
     );

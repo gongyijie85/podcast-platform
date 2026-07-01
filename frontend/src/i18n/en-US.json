@@ -132,6 +132,21 @@
     "useBook": "Use this book",
     "noResults": "No matching books"
   },
+  "bookLibrary": {
+    "title": "Book library",
+    "viewDetail": "View detail",
+    "makePodcast": "Make podcast"
+  },
+  "bookDetail": {
+    "title": "Live pitch script",
+    "generate": "Generate",
+    "save": "Save",
+    "generating": "Generating...",
+    "saving": "Saving...",
+    "generatedAt": "Generated: {{time}}",
+    "notFound": "Book not found",
+    "back": "← Back to library"
+  },
   "projectCreate": {
     "title": "Create project",
     "steps": {

@@ -39,7 +39,7 @@ const ITEMS: NavItem[] = [
   { key: 'dashboard', labelKey: 'nav.dashboard', path: '/dashboard', icon: <DashboardIcon />, requireAuth: true },
   { key: 'projects', labelKey: 'nav.projects', path: '/projects', icon: <LibraryBooksIcon />, requireAuth: true },
   { key: 'new', labelKey: 'dashboard.newProject', path: '/projects/new', icon: <AddCircleOutlineIcon />, requireAuth: true },
-  { key: 'book', labelKey: 'nav.book', path: '/book-search', icon: <SearchIcon /> },
+  { key: 'book', labelKey: 'nav.book', path: '/books', icon: <SearchIcon /> },
   { key: 'settings', labelKey: 'nav.settings', path: '/settings', icon: <SettingsIcon />, requireAuth: true },
 ];
 

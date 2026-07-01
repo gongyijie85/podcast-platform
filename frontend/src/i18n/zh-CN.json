@@ -132,6 +132,21 @@
     "useBook": "使用此书",
     "noResults": "未找到匹配的图书"
   },
+  "bookLibrary": {
+    "title": "选书库",
+    "viewDetail": "查看详情",
+    "makePodcast": "制作播客"
+  },
+  "bookDetail": {
+    "title": "主播口播稿",
+    "generate": "AI 生成",
+    "save": "保存",
+    "generating": "生成中...",
+    "saving": "保存中...",
+    "generatedAt": "生成时间：{{time}}",
+    "notFound": "图书未找到",
+    "back": "← 返回选书库"
+  },
   "projectCreate": {
     "title": "创建项目",
     "steps": {

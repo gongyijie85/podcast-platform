@@ -1,5 +1,32 @@
 # 播客平台 CHANGELOG
 
+## [0.4.0] - 2026-07-01
+
+### 修改时间
+- 2026-07-01（上海时间）
+
+### 选书模块解耦与主播口播稿
+
+将选书与播客制作功能分离，选书模块独立成子系统，为进口书电商直播带货做准备。
+
+#### 新增
+- 选书模块独立成子系统，新增 `/books` 路由与 `BookLibrary` 页面
+- 新增图书详情页 `/books/:isbn`，左右栏布局展示图书信息与主播口播稿编辑器
+- 主播口播稿支持 AI 生成（基于图书元数据，100-200 字直播话术）与手动编辑保存
+- 后端新增 `LivePitchService`、3 个 API 端点（详情查询/口播稿保存/AI 生成）
+- `BookOrganizer` 新增 `detailMode` 模式，`BookCard` 新增 `useLabel` prop
+- i18n 新增 `bookLibrary` 与 `bookDetail` 命名空间
+- `BookDetail.test.tsx` 单元测试 3 个（渲染/生成/保存）
+
+#### 变更
+- 侧边栏"图书整理"导航指向 `/books`（原 `/book-search` 重定向兼容）
+- `BookLibraryItem` 模型新增 `livePitch` + `livePitchGeneratedAt` 字段
+- 三个 `package.json` 版本号统一升级到 0.4.0
+
+#### 兼容
+- 旧路由 `/book-search` 自动重定向到 `/books`
+- `BookOrganizer` 与 `BookCard` 原有行为完全不变（新 prop 默认 undefined）
+
 ## [0.3.1] - 2026-06-25
 
 ### 修改时间

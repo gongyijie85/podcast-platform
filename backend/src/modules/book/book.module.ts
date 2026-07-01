@@ -6,6 +6,7 @@ import { GoogleBooksAdapter } from './adapters/google-books.adapter';
 import { BookRankAdapter } from './adapters/bookrank.adapter';
 import { BookLibraryService } from './book-library.service';
 import { BookLibrarySyncService } from './book-library-sync.service';
+import { LivePitchService } from './live-pitch.service';
 import { QueueModule } from '../queue/queue.module';
 
 @Module({
@@ -14,11 +15,12 @@ import { QueueModule } from '../queue/queue.module';
     BookService,
     BookLibraryService,
     BookLibrarySyncService,
+    LivePitchService,
     OpenLibraryAdapter,
     GoogleBooksAdapter,
     BookRankAdapter,
   ],
   controllers: [BookController],
-  exports: [BookService, BookLibraryService, BookLibrarySyncService, OpenLibraryAdapter, GoogleBooksAdapter],
+  exports: [BookService, BookLibraryService, BookLibrarySyncService, LivePitchService, OpenLibraryAdapter, GoogleBooksAdapter],
 })
 export class BookModule {}

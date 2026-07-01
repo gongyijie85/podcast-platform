@@ -270,4 +270,69 @@ describe('BookLibraryService', () => {
       queryCount: 2,
     });
   });
+
+  it('findByIsbn returns single book detail with livePitch field', async () => {
+    prisma.bookLibraryItem.findUnique.mockResolvedValueOnce({
+      id: 'lib-1',
+      isbn: '9787544291170',
+      title: '解忧杂货店',
+      author: '东野圭吾',
+      coverUrl: 'https://example.com/cover.jpg',
+      summary: '中文简介',
+      publisher: '南海出版公司',
+      publishedDate: '2014-05',
+      pageCount: 291,
+      source: 'googlebooks',
+      category: null,
+      categoryName: null,
+      rank: null,
+      queryCount: 5,
+      metadataSyncStatus: 'synced',
+      metadataSyncAttempts: 1,
+      metadataSyncedAt: now,
+      metadataSyncError: null,
+      livePitch: '已有的口播稿',
+      livePitchGeneratedAt: now,
+      firstSeenAt: now,
+      lastSeenAt: now,
+    });
+
+    const result = await service().findByIsbn('9787544291170');
+
+    expect(result).toMatchObject({
+      isbn: '9787544291170',
+      title: '解忧杂货店',
+      livePitch: '已有的口播稿',
+      livePitchGeneratedAt: now.toISOString(),
+    });
+  });
+
+  it('findByIsbn returns null for invalid ISBN', async () => {
+    const result = await service().findByIsbn('invalid-isbn');
+    expect(result).toBeNull();
+  });
+
+  it('updateLivePitch updates livePitch and livePitchGeneratedAt', async () => {
+    await service().upsertMany([
+      {
+        isbn: '9787544291170',
+        title: '解忧杂货店',
+        author: '东野圭吾',
+        summary: '中文简介',
+        source: 'googlebooks',
+      },
+    ]);
+
+    const updated = await service().updateLivePitch('9787544291170', '新的口播稿内容');
+
+    expect(updated).toMatchObject({
+      isbn: '9787544291170',
+      livePitch: '新的口播稿内容',
+    });
+    expect(updated.livePitchGeneratedAt).toBeTruthy();
+  });
+
+  it('updateLivePitch throws when book not found', async () => {
+    await expect(service().updateLivePitch('9780000000002', '口播稿')).rejects.toThrow(/Book not found/);
+  });
 });

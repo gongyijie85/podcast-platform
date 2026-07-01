@@ -64,6 +64,38 @@ export class BookLibraryService {
     });
   }
 
+  /**
+   * 按 ISBN 查询单本详情（含口播稿）
+   */
+  async findByIsbn(isbn: string): Promise<BookLibraryItem | null> {
+    const normalized = normalizeIsbn(isbn);
+    if (!normalized) return null;
+    const item = await this.prisma.bookLibraryItem.findUnique({ where: { isbn: normalized } });
+    return item ? this.toDto(item) : null;
+  }
+
+  /**
+   * 更新口播稿（手动编辑保存或 AI 生成写入）
+   */
+  async updateLivePitch(isbn: string, livePitch: string): Promise<BookLibraryItem> {
+    const normalized = normalizeIsbn(isbn);
+    if (!normalized) {
+      throw new Error(`Invalid ISBN: ${isbn}`);
+    }
+    const existing = await this.prisma.bookLibraryItem.findUnique({ where: { isbn: normalized } });
+    if (!existing) {
+      throw new Error(`Book not found: ${isbn}`);
+    }
+    const updated = await this.prisma.bookLibraryItem.update({
+      where: { isbn: normalized },
+      data: {
+        livePitch: livePitch.trim() || null,
+        livePitchGeneratedAt: new Date(),
+      },
+    });
+    return this.toDto(updated);
+  }
+
   async upsertMany(
     books: Array<BookMetadata | BookRankMappedBook>,
     defaults: Partial<Pick<BookLibraryItem, 'category' | 'categoryName' | 'rank'>> = {},
@@ -223,6 +255,8 @@ export class BookLibraryService {
     metadataSyncAttempts?: number | null;
     metadataSyncedAt?: Date | null;
     metadataSyncError?: string | null;
+    livePitch?: string | null;
+    livePitchGeneratedAt?: Date | null;
     firstSeenAt: Date;
     lastSeenAt: Date;
   }): BookLibraryItem {
@@ -248,6 +282,8 @@ export class BookLibraryService {
       metadataSyncAttempts: item.metadataSyncAttempts ?? 0,
       metadataSyncedAt: item.metadataSyncedAt?.toISOString() ?? null,
       metadataSyncError: item.metadataSyncError ?? null,
+      livePitch: item.livePitch ?? null,
+      livePitchGeneratedAt: item.livePitchGeneratedAt?.toISOString() ?? null,
       firstSeenAt: item.firstSeenAt.toISOString(),
       lastSeenAt: item.lastSeenAt.toISOString(),
     };

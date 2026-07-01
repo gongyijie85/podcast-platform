@@ -110,6 +110,8 @@ model BookLibraryItem {
   metadataSyncAttempts Int @default(0) @map("metadata_sync_attempts")
   metadataSyncedAt DateTime? @map("metadata_synced_at")
   metadataSyncError String? @db.Text @map("metadata_sync_error")
+  livePitch    String?  @db.Text @map("live_pitch")
+  livePitchGeneratedAt DateTime? @map("live_pitch_generated_at")
   firstSeenAt   DateTime @default(now()) @map("first_seen_at")
   lastSeenAt    DateTime @updatedAt @map("last_seen_at")
 

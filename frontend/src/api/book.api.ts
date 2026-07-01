@@ -1,5 +1,6 @@
 import { request } from './client';
 import type {
+  BookLibraryItem,
   BookLibraryListResult,
   BookLibrarySyncStartResult,
   BookLibrarySyncStatusFilter,
@@ -8,6 +9,7 @@ import type {
   BookRankImportPayload,
   BookRankImportResult,
   FetchMetadataResult,
+  GenerateLivePitchResult,
   ResolveMetadataResult,
   BgmTrackDto,
   BgmCategory,
@@ -29,6 +31,15 @@ export const bookApi = {
     syncStatus?: BookLibrarySyncStatusFilter;
   } = {}): Promise<BookLibraryListResult> {
     return request<BookLibraryListResult>({ method: 'GET', url: '/books/library', params });
+  },
+  async getDetail(isbn: string): Promise<BookLibraryItem | null> {
+    return request<BookLibraryItem | null>({ method: 'GET', url: `/books/library/${isbn}` });
+  },
+  async updatePitch(isbn: string, livePitch: string): Promise<BookLibraryItem> {
+    return request<BookLibraryItem>({ method: 'PATCH', url: `/books/library/${isbn}`, data: { livePitch } });
+  },
+  async generatePitch(isbn: string): Promise<GenerateLivePitchResult> {
+    return request<GenerateLivePitchResult>({ method: 'POST', url: `/books/library/${isbn}/pitch/generate` });
   },
   async importBookRank(payload: BookRankImportPayload): Promise<BookRankImportResult> {
     return request<BookRankImportResult>({ method: 'POST', url: '/books/library/import/bookrank', data: payload });
