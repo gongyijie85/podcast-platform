@@ -89,7 +89,7 @@ export const configuration = () => ({
     },
     googleBooks: {
       base: process.env.GOOGLE_BOOKS_BASE || 'https://www.googleapis.com/books/v1',
-      apiKey: process.env.GOOGLE_API_KEY || '',
+      apiKey: process.env.GOOGLE_BOOKS_API_KEY || process.env.GOOGLE_API_KEY || '',
     },
     bookRank: {
       base: process.env.BOOKRANK_API_BASE_URL || 'https://bookrank-ckml.onrender.com',

@@ -4,7 +4,7 @@ import axios from 'axios';
 import axiosRetry from 'axios-retry';
 import type { BookApiAdapter } from './book-api.adapter';
 import type { BookMetadata } from '@shared/book';
-import { normalizeIsbn } from '../../../common/utils/isbn';
+import { isbnToIsbn13, normalizeIsbn } from '../../../common/utils/isbn';
 
 type GoogleIndustryIdentifier = {
   type?: string;
@@ -51,6 +51,8 @@ export class GoogleBooksAdapter implements BookApiAdapter {
   readonly name = 'googlebooks';
   private readonly logger = new Logger(GoogleBooksAdapter.name);
   private readonly http = axios.create({ timeout: 8000 });
+  private readonly cache = new Map<string, { data: BookMetadata; ts: number }>();
+  private readonly cacheTtlMs = 10 * 60 * 1000;
   private unavailableUntil = 0;
 
   constructor(private readonly config: ConfigService) {
@@ -65,32 +67,48 @@ export class GoogleBooksAdapter implements BookApiAdapter {
   }
 
   async fetchByIsbn(isbn: string): Promise<BookMetadata | null> {
+    const lookupIsbn = this.cleanIdentifier(isbn);
+    const cached = this.cache.get(lookupIsbn);
+    if (cached && Date.now() - cached.ts < this.cacheTtlMs) return cached.data;
+
     if (Date.now() < this.unavailableUntil) {
-      return this.mockLookup(isbn);
+      return this.mockLookup(lookupIsbn);
     }
 
     const base = this.config.get<string>('thirdParty.googleBooks.base');
     const apiKey = this.config.get<string>('thirdParty.googleBooks.apiKey');
-    if (!base) return this.mockLookup(isbn);
+    if (!base) return this.mockLookup(lookupIsbn);
     try {
-      const items = await this.searchVolumes(base, isbn, apiKey, `isbn:${isbn}`);
-      const fallbackItems = items.length > 0 ? [] : await this.searchVolumes(base, isbn, apiKey, isbn);
-      const selected = this.pickBestVolume(isbn, [...items, ...fallbackItems]);
+      const exactItems = await this.searchExactCandidates(base, lookupIsbn, apiKey);
+      const fallbackItems = exactItems.length > 0 ? [] : await this.searchVolumes(base, apiKey, lookupIsbn);
+      const selected = this.pickBestVolume(lookupIsbn, [...exactItems, ...fallbackItems]);
       if (!selected?.volumeInfo) return null;
 
       const detail = selected.id ? await this.fetchVolumeDetail(base, selected.id, apiKey) : null;
       const volume = this.mergeVolume(selected, detail);
-      return this.toMetadata(isbn, volume);
+      const metadata = this.toMetadata(lookupIsbn, volume);
+      if (metadata) this.cache.set(lookupIsbn, { data: metadata, ts: Date.now() });
+      return metadata;
     } catch (e) {
       if (axios.isAxiosError(e) && e.response?.status === 429) {
         this.unavailableUntil = Date.now() + 60_000;
       }
       this.logger.warn(`GoogleBooks unreachable, falling back to mock: ${(e as Error).message}`);
-      return this.mockLookup(isbn);
+      return this.mockLookup(lookupIsbn);
     }
   }
 
-  private async searchVolumes(base: string, isbn: string, apiKey: string | undefined, query: string): Promise<GoogleVolume[]> {
+  private async searchExactCandidates(base: string, isbn: string, apiKey: string | undefined): Promise<GoogleVolume[]> {
+    const collected: GoogleVolume[] = [];
+    for (const query of this.buildSearchQueries(isbn)) {
+      const items = await this.searchVolumes(base, apiKey, query);
+      collected.push(...items);
+      if (this.hasExactIdentifierMatch(isbn, items)) break;
+    }
+    return this.dedupeVolumes(collected);
+  }
+
+  private async searchVolumes(base: string, apiKey: string | undefined, query: string): Promise<GoogleVolume[]> {
     const resp = await this.http.get<GoogleVolumesResponse>(
       `${base}/volumes`,
       {
@@ -135,12 +153,12 @@ export class GoogleBooksAdapter implements BookApiAdapter {
   }
 
   private pickBestVolume(isbn: string, items: GoogleVolume[]): GoogleVolume | null {
-    const normalized = normalizeIsbn(isbn);
+    const targets = this.targetIsbns(isbn);
     const candidates = items
       .filter((item) => Boolean(item.volumeInfo?.title))
       .map((item) => ({
         item,
-        score: this.scoreVolume(normalized, item),
+        score: this.scoreVolume(targets, item),
       }))
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score);
@@ -148,11 +166,14 @@ export class GoogleBooksAdapter implements BookApiAdapter {
     return candidates[0]?.item ?? null;
   }
 
-  private scoreVolume(isbn: string | null, item: GoogleVolume): number {
+  private scoreVolume(targets: Set<string>, item: GoogleVolume): number {
     const vi = item.volumeInfo;
     if (!vi?.title) return 0;
     const matchesIsbn = Boolean(
-      isbn && (vi.industryIdentifiers ?? []).some((id) => Boolean(id.identifier && normalizeIsbn(id.identifier) === isbn)),
+      (vi.industryIdentifiers ?? []).some((id) => {
+        const candidate = this.cleanIdentifier(id.identifier);
+        return Boolean(candidate && targets.has(candidate));
+      }),
     );
     let score = matchesIsbn ? 100 : 10;
     if (vi.description && this.cleanDescription(vi.description)) score += 25;
@@ -213,7 +234,10 @@ export class GoogleBooksAdapter implements BookApiAdapter {
       .replace(/&nbsp;/gi, ' ')
       .replace(/&amp;/gi, '&')
       .replace(/&quot;/gi, '"')
+      .replace(/&apos;/gi, "'")
       .replace(/&#39;/g, "'")
+      .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+      .replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCodePoint(parseInt(code, 16)))
       .replace(/\s+/g, ' ')
       .trim();
     if (!cleaned || cleaned.length < 30) return null;
@@ -227,6 +251,46 @@ export class GoogleBooksAdapter implements BookApiAdapter {
 
   private clean(value: string | null | undefined): string {
     return value?.replace(/\s+/g, ' ').trim() ?? '';
+  }
+
+  private cleanIdentifier(value: string | null | undefined): string {
+    return value?.replace(/[-\s]/g, '').trim().toUpperCase() ?? '';
+  }
+
+  private buildSearchQueries(isbn: string): string[] {
+    const targets = Array.from(this.targetIsbns(isbn));
+    return targets.map((target) => `isbn:${target}`);
+  }
+
+  private targetIsbns(isbn: string): Set<string> {
+    const cleaned = this.cleanIdentifier(isbn);
+    const normalized = normalizeIsbn(cleaned);
+    const targets = new Set<string>([cleaned]);
+    if (normalized) {
+      targets.add(normalized);
+      if (normalized.length === 10) {
+        const isbn13 = isbnToIsbn13(normalized);
+        if (isbn13) targets.add(isbn13);
+      }
+    }
+    return targets;
+  }
+
+  private hasExactIdentifierMatch(isbn: string, items: GoogleVolume[]): boolean {
+    const targets = this.targetIsbns(isbn);
+    return items.some((item) =>
+      (item.volumeInfo?.industryIdentifiers ?? []).some((id) => targets.has(this.cleanIdentifier(id.identifier))),
+    );
+  }
+
+  private dedupeVolumes(items: GoogleVolume[]): GoogleVolume[] {
+    const seen = new Set<string>();
+    return items.filter((item, index) => {
+      const key = item.id ?? `${item.volumeInfo?.title ?? ''}:${item.volumeInfo?.authors?.join(',') ?? ''}:${index}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   private mockLookup(isbn: string): BookMetadata | null {

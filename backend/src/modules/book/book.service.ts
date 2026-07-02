@@ -112,6 +112,9 @@ export class BookService {
       if (open && !this.isGenericMockMetadata(open) && this.hasFullSummary(open)) {
         return this.mergePreferPrimary(google, open);
       }
+      if (cached && this.hasFullSummary(cached)) {
+        return this.mergePreferPrimary(google, cached);
+      }
 
       return google;
     }
@@ -164,7 +167,7 @@ export class BookService {
 
   private shouldUseCachedCompleteMetadata(meta: BookMetadata): boolean {
     if (!this.shouldUseCachedMetadata(meta)) return false;
-    return meta.source === 'bookrank' || this.hasFullSummary(meta);
+    return (meta.source === 'bookrank' || meta.source === 'googlebooks') && this.hasFullSummary(meta);
   }
 
   private shouldUseCachedPartialMetadata(meta: BookMetadata): boolean {

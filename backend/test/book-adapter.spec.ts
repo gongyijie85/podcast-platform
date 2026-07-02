@@ -162,6 +162,53 @@ describe('Book adapters (mock fallback)', () => {
     });
   });
 
+  it('GoogleBooksAdapter expands ISBN-10 lookups to ISBN-13 and caches resolved metadata', async () => {
+    const a = new GoogleBooksAdapter(cfg());
+    const get = jest
+      .fn()
+      .mockResolvedValueOnce({ data: { items: [] } })
+      .mockResolvedValueOnce({
+        data: {
+          items: [
+            {
+              id: 'isbn13-volume',
+              volumeInfo: {
+                title: 'The Great Gatsby',
+                authors: ['F. Scott Fitzgerald'],
+                description: 'A canonical novel about wealth, longing, class performance, and American illusion.',
+                industryIdentifiers: [{ type: 'ISBN_13', identifier: '9780743273565' }],
+              },
+            },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 'isbn13-volume',
+          volumeInfo: {
+            title: 'The Great Gatsby',
+            authors: ['F. Scott Fitzgerald'],
+            description: 'A canonical novel about wealth, longing, class performance, and American illusion.',
+            industryIdentifiers: [{ type: 'ISBN_13', identifier: '9780743273565' }],
+          },
+        },
+      });
+    (a as unknown as { http: { get: jest.Mock } }).http.get = get;
+
+    const first = await a.fetchByIsbn('0743273567');
+    const second = await a.fetchByIsbn('0743273567');
+
+    expect(first).toMatchObject({
+      isbn: '0743273567',
+      title: 'The Great Gatsby',
+      source: 'googlebooks',
+    });
+    expect(second).toEqual(first);
+    expect(get).toHaveBeenCalledTimes(3);
+    expect(get.mock.calls[0][1]).toMatchObject({ params: expect.objectContaining({ q: 'isbn:0743273567' }) });
+    expect(get.mock.calls[1][1]).toMatchObject({ params: expect.objectContaining({ q: 'isbn:9780743273565' }) });
+  });
+
   it('GoogleBooksAdapter prefers exact ISBN matches and fetches detail descriptions', async () => {
     const a = new GoogleBooksAdapter(cfg());
     const get = jest
