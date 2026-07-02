@@ -11,6 +11,7 @@ import { normalizeIsbn } from '../../common/utils/isbn';
 import type { TtsVoice, TtsPreviewResult } from '@shared/book';
 import type { ProgressEvent } from '@shared/job';
 import { STAGE_WEIGHTS } from '../queue/constants';
+import { synthesizeMockSilence } from './adapters/mock-audio.util';
 
 @Injectable()
 export class TtsService {
@@ -39,9 +40,9 @@ export class TtsService {
 
   /**
    * Run TTS for every segment of the project's latest script, upload to storage,
-   * write AudioFile rows, then trigger subtitle stage.
+   * write AudioFile rows, then trigger subtitle or mix stage.
    */
-  async synthesizeAllForProject(projectId: string): Promise<{ count: number; totalMs: number }> {
+  async synthesizeAllForProject(projectId: string): Promise<{ count: number; totalMs: number; failedCount: number }> {
     const traceId = randomUUID();
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -55,6 +56,7 @@ export class TtsService {
     const total = script.segments.length;
     let cursorMs = 0;
     let synthesized = 0;
+    let failedCount = 0;
 
     for (let i = 0; i < total; i++) {
       const seg = script.segments[i];
@@ -62,7 +64,21 @@ export class TtsService {
       const voiceId = voice?.voiceId ?? 'BV001_streaming';
       const adapter = this.pickAdapter(voiceId, voice?.provider);
 
-      const { buffer, durationMs } = await adapter.synthesize(seg.text, voiceId);
+      let buffer: Buffer;
+      let durationMs: number;
+      try {
+        const synthesizedAudio = await adapter.synthesize(seg.text, voiceId);
+        buffer = synthesizedAudio.buffer;
+        durationMs = synthesizedAudio.durationMs;
+      } catch (error) {
+        failedCount += 1;
+        this.logger.warn(
+          `TTS segment failed; using silence fallback. project=${projectId} segment=${seg.id} voice=${voiceId}: ${(error as Error).message}`,
+        );
+        const fallback = synthesizeMockSilence(seg.text);
+        buffer = fallback.buffer;
+        durationMs = fallback.durationMs;
+      }
       const key = `tts/${projectId}/${seg.id}.mp3`;
       await this.storage.put(key, buffer, 'audio/mpeg');
 
@@ -107,10 +123,24 @@ export class TtsService {
       await this.progress.emit(event);
     }
 
-    await this.queues.enqueueSubtitle(projectId);
+    if (project.subtitleOn) {
+      await this.queues.enqueueSubtitle(projectId);
+    } else {
+      const event: ProgressEvent = {
+        type: 'project.progress',
+        projectId,
+        stage: 'subtitle',
+        progress: STAGE_WEIGHTS.subtitle,
+        message: '字幕已关闭，直接进入播客合成',
+        timestamp: Date.now(),
+        traceId,
+      };
+      await this.progress.emit(event);
+      await this.queues.enqueueMix(projectId);
+    }
     void STAGE_WEIGHTS; // referenced to satisfy imports
     void normalizeIsbn; // ditto
-    return { count: synthesized, totalMs: cursorMs };
+    return { count: synthesized, totalMs: cursorMs, failedCount };
   }
 
   private pickAdapter(
