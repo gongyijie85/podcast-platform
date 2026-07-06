@@ -1,7 +1,7 @@
 # Podcast Platform
 
 > ISBN → AI Podcast 一站式自动生产平台。
-> 当前版本：**v0.6.3**（图书识别结果中文翻译与持久化）
+> 当前版本：**v0.6.4**（主播口播稿提示词优化）
 > 完整 PRD 见 `docs/podcast-platform-prd.md`；架构见 `docs/podcast-platform-architecture.md`。
 > 变更日志见 [`CHANGELOG.md`](CHANGELOG.md)。
 

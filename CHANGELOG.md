@@ -1,5 +1,35 @@
 # 播客平台 CHANGELOG
 
+## [0.6.4] - 2026-07-06
+
+### 修改时间
+- 2026-07-06（上海时间）
+
+### 主播口播稿提示词优化
+
+针对英文原著（如 ISBN 9780375811746《Flipped》）生成口播稿时出现中英混杂、截断、套用英文原名等问题，优化 LLM 提示词与兜底模板。
+
+#### 提示词优化
+- `backend/src/modules/book/prompts/live-pitch.template.ts`：
+  - system prompt 明确要求**全中文输出**，禁止出现英文书名、作者名或原文引用。
+  - 强制使用用户提供的**中文书名**，避免直接使用英文原名。
+  - 规范口播稿结构：开场钩子 → 内容亮点 → 适合人群 → 行动号召。
+  - 字数放宽到 150-250 字，要求语义完整、不断句。
+- `backend/src/modules/book/live-pitch.service.ts`：
+  - `mockGenerate` 兜底模板优先使用 `titleZh` / `authorZh` / `summaryZh`，无中文时再 fallback 到英文原字段。
+
+#### 验证结果
+| 检查项 | 命令 | 结果 |
+|--------|------|------|
+| backend lint | `pnpm --filter backend lint` | 通过 |
+| backend 类型检查 | `pnpm --filter backend exec tsc --noEmit` | 通过 |
+| backend 单元测试 | `pnpm --filter backend test` | 121 passed |
+| frontend lint | `pnpm --filter frontend lint` | 通过 |
+| frontend 单元测试 | `pnpm --filter frontend test` | 198 passed |
+| frontend 构建 | `pnpm --filter frontend build` | 通过 |
+
+---
+
 ## [0.6.3] - 2026-07-06
 
 ### 修改时间
