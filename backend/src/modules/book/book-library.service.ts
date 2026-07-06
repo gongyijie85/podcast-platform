@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BookRankAdapter, type BookRankMappedBook } from './adapters/bookrank.adapter';
 import { normalizeIsbn } from '../../common/utils/isbn';
+import type { BookTranslation } from './translation.service';
 import type {
   BookLibraryItem,
   BookLibraryListResult,
@@ -96,6 +97,27 @@ export class BookLibraryService {
     return this.toDto(updated);
   }
 
+  /**
+   * 更新图书中文翻译字段（缓存 LLM 翻译结果）
+   */
+  async updateTranslation(isbn: string, translation: BookTranslation): Promise<BookLibraryItem> {
+    const normalized = normalizeIsbn(isbn);
+    if (!normalized) {
+      throw new Error(`Invalid ISBN: ${isbn}`);
+    }
+    const existing = await this.prisma.bookLibraryItem.findUnique({ where: { isbn: normalized } });
+    if (!existing) {
+      throw new Error(`Book not found: ${isbn}`);
+    }
+    const data: Prisma.BookLibraryItemUpdateInput = {};
+    if (translation.titleZh !== undefined) data.titleZh = translation.titleZh || null;
+    if (translation.authorZh !== undefined) data.authorZh = translation.authorZh || null;
+    if (translation.publisherZh !== undefined) data.publisherZh = translation.publisherZh || null;
+    if (translation.summaryZh !== undefined) data.summaryZh = translation.summaryZh || null;
+    const updated = await this.prisma.bookLibraryItem.update({ where: { isbn: normalized }, data });
+    return this.toDto(updated);
+  }
+
   async upsertMany(
     books: Array<BookMetadata | BookRankMappedBook>,
     defaults: Partial<Pick<BookLibraryItem, 'category' | 'categoryName' | 'rank'>> = {},
@@ -177,6 +199,10 @@ export class BookLibraryService {
           publisher: this.cleanNullable(book.publisher),
           publishedDate: this.cleanNullable(book.publishedDate),
           pageCount: book.pageCount ?? null,
+          ...('titleZh' in book && book.titleZh !== undefined ? { titleZh: this.cleanNullable(book.titleZh) } : {}),
+          ...('authorZh' in book && book.authorZh !== undefined ? { authorZh: this.cleanNullable(book.authorZh) } : {}),
+          ...('publisherZh' in book && book.publisherZh !== undefined ? { publisherZh: this.cleanNullable(book.publisherZh) } : {}),
+          ...('summaryZh' in book && book.summaryZh !== undefined ? { summaryZh: this.cleanNullable(book.summaryZh) } : {}),
           source: book.source,
           category,
           categoryName,
@@ -199,6 +225,10 @@ export class BookLibraryService {
         ...this.presentNullableString('summary', book.summary, existing.summary, preserveBookRank),
         ...this.presentNullableString('publisher', book.publisher, existing.publisher, preserveBookRank),
         ...this.presentNullableString('publishedDate', book.publishedDate, existing.publishedDate, preserveBookRank),
+        ...('titleZh' in book && book.titleZh !== undefined ? { titleZh: this.cleanNullable(book.titleZh) } : {}),
+        ...('authorZh' in book && book.authorZh !== undefined ? { authorZh: this.cleanNullable(book.authorZh) } : {}),
+        ...('publisherZh' in book && book.publisherZh !== undefined ? { publisherZh: this.cleanNullable(book.publisherZh) } : {}),
+        ...('summaryZh' in book && book.summaryZh !== undefined ? { summaryZh: this.cleanNullable(book.summaryZh) } : {}),
         ...(book.pageCount && !(preserveBookRank && existing.pageCount) ? { pageCount: book.pageCount } : {}),
         source: this.preferSource(existing.source, book.source),
         ...this.syncStatusPatch(book),
@@ -246,6 +276,10 @@ export class BookLibraryService {
     publisher: string | null;
     publishedDate: string | null;
     pageCount: number | null;
+    titleZh: string | null;
+    authorZh: string | null;
+    publisherZh: string | null;
+    summaryZh: string | null;
     source: string;
     category: string | null;
     categoryName: string | null;
@@ -273,6 +307,10 @@ export class BookLibraryService {
       publisher: item.publisher,
       publishedDate: item.publishedDate,
       pageCount: item.pageCount,
+      titleZh: item.titleZh,
+      authorZh: item.authorZh,
+      publisherZh: item.publisherZh,
+      summaryZh: item.summaryZh,
       source: this.toBookSource(item.source),
       category: item.category,
       categoryName: item.categoryName,

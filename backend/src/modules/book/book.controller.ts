@@ -17,6 +17,7 @@ import { BookService } from './book.service';
 import { BookRankImportDto, FetchMetadataDto, ResolveMetadataDto } from './dto/fetch-metadata.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { CoverRecognizeResultDto, type CoverRecognizeCandidate, type CoverRawRecognition } from './dto/cover-recognize.dto';
+import { TranslationService } from './translation.service';
 import { BookLibraryService } from './book-library.service';
 import { BookLibrarySyncService } from './book-library-sync.service';
 import { CoverRecognizeService, type CoverRecognition } from './cover-recognize.service';
@@ -46,6 +47,7 @@ export class BookController {
     private readonly librarySync: BookLibrarySyncService,
     private readonly livePitch: LivePitchService,
     private readonly coverRecognize: CoverRecognizeService,
+    private readonly translation: TranslationService,
     private readonly googleBooks: GoogleBooksAdapter,
     @Inject(forwardRef(() => QueueService))
     private readonly queues: QueueService,
@@ -98,7 +100,7 @@ export class BookController {
 
     const candidates = await this.resolveCandidates(recognition);
     return {
-      candidates: this.dedupeAndLimit(candidates, recognition),
+      candidates: await this.dedupeAndLimit(candidates, recognition),
       rawRecognition: this.toRawRecognition(recognition),
     };
   }
@@ -122,7 +124,7 @@ export class BookController {
 
     const candidates = await this.resolveCandidates(recognition);
     return {
-      candidates: this.dedupeAndLimit(candidates, recognition),
+      candidates: await this.dedupeAndLimit(candidates, recognition),
       rawRecognition: this.toRawRecognition(recognition),
     };
   }
@@ -145,13 +147,14 @@ export class BookController {
 
     const candidates = await this.resolveCandidates(recognition);
     return {
-      candidates: this.dedupeAndLimit(candidates, recognition),
+      candidates: await this.dedupeAndLimit(candidates, recognition),
       rawRecognition: this.toRawRecognition(recognition),
     };
   }
 
   /**
    * 按 ISBN → 本地书库 → Google Books 的优先级解析候选图书
+   * 从 Google Books 拉到的记录会先 upsert 到本地书库，确保后续详情页能命中并缓存翻译
    */
   private async resolveCandidates(recognition: CoverRecognition): Promise<CoverRecognizeCandidate[]> {
     const candidates: CoverRecognizeCandidate[] = [];
@@ -164,7 +167,8 @@ export class BookController {
       } else {
         const remoteByIsbn = await this.googleBooks.fetchByIsbn(recognition.isbn).catch(() => null);
         if (remoteByIsbn) {
-          candidates.push(this.metadataToCandidate(remoteByIsbn));
+          const saved = await this.library.upsertMany([remoteByIsbn]);
+          if (saved[0]) candidates.push(this.libraryItemToCandidate(saved[0]));
         }
       }
     }
@@ -178,7 +182,8 @@ export class BookController {
     // 3. Google Books 兜底：用书名+作者搜索外部数据
     if (candidates.length < 5 && recognition.title) {
       const remote = await this.googleBooks.searchByTitle(recognition.title, recognition.author).catch(() => []);
-      candidates.push(...remote.map((item) => this.metadataToCandidate(item)));
+      const saved = await this.library.upsertMany(remote);
+      candidates.push(...saved.map((item) => this.libraryItemToCandidate(item)));
     }
 
     return candidates;
@@ -197,6 +202,10 @@ export class BookController {
       publisher: item.publisher ?? null,
       publishedDate: item.publishedDate ?? null,
       pageCount: item.pageCount ?? null,
+      titleZh: item.titleZh ?? null,
+      authorZh: item.authorZh ?? null,
+      publisherZh: item.publisherZh ?? null,
+      summaryZh: item.summaryZh ?? null,
     };
   }
 
@@ -213,13 +222,21 @@ export class BookController {
       publisher: item.publisher ?? null,
       publishedDate: item.publishedDate ?? null,
       pageCount: item.pageCount ?? null,
+      titleZh: item.titleZh ?? null,
+      authorZh: item.authorZh ?? null,
+      publisherZh: item.publisherZh ?? null,
+      summaryZh: item.summaryZh ?? null,
     };
   }
 
   /**
    * 候选去重并按匹配度排序，最多返回 5 本
+   * 对非中文图书自动调用 LLM 翻译，保留英文原文并附加中文译文字段
    */
-  private dedupeAndLimit(candidates: CoverRecognizeCandidate[], recognition: CoverRecognition): CoverRecognizeCandidate[] {
+  private async dedupeAndLimit(
+    candidates: CoverRecognizeCandidate[],
+    recognition: CoverRecognition,
+  ): Promise<CoverRecognizeCandidate[]> {
     const seen = new Set<string>();
     const unique = candidates.filter((item) => {
       if (seen.has(item.isbn)) return false;
@@ -233,7 +250,31 @@ export class BookController {
     }));
 
     scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, 5).map(({ item }) => item);
+    const top = scored.slice(0, 5).map(({ item }) => item);
+
+    // 并行翻译前 5 本候选，失败时不阻塞返回原文
+    const translated = await Promise.all(
+      top.map(async (item) => {
+        const sampleText = [item.title, item.author, item.summary].filter(Boolean).join(' ');
+        if (!this.translation.shouldTranslate(recognition.language, sampleText)) {
+          return item;
+        }
+        const zh = await this.translation.translateBook({
+          title: item.title,
+          author: item.author,
+          publisher: item.publisher,
+          summary: item.summary,
+        });
+        const merged = { ...item, ...zh };
+        if (Object.keys(zh).length > 0) {
+          // 缓存翻译结果到书库；候选可能来自非书库场景，失败时忽略
+          await this.library.updateTranslation(item.isbn, zh).catch(() => undefined);
+        }
+        return merged;
+      }),
+    );
+
+    return translated;
   }
 
   /**
@@ -315,7 +356,29 @@ export class BookController {
   @Public()
   @Get('books/library/:isbn')
   async getBookDetail(@Param('isbn') isbn: string): Promise<BookLibraryItem | null> {
-    return this.library.findByIsbn(isbn);
+    const item = await this.library.findByIsbn(isbn);
+    if (!item) return null;
+
+    // 已缓存中文翻译则直接返回，避免重复调用 LLM
+    if (item.titleZh) {
+      return item;
+    }
+
+    const sampleText = [item.title, item.author, item.summary].filter(Boolean).join(' ');
+    if (!this.translation.shouldTranslate(null, sampleText)) {
+      return item;
+    }
+
+    const zh = await this.translation.translateBook({
+      title: item.title,
+      author: item.author,
+      publisher: item.publisher,
+      summary: item.summary,
+    });
+    if (Object.keys(zh).length > 0) {
+      await this.library.updateTranslation(item.isbn, zh);
+    }
+    return { ...item, ...zh };
   }
 
   @Public()

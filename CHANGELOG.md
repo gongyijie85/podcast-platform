@@ -1,5 +1,65 @@
 # 播客平台 CHANGELOG
 
+## [0.6.3] - 2026-07-06
+
+### 修改时间
+- 2026-07-06（上海时间）
+
+### 图书识别结果中文翻译与持久化
+
+针对英文原著（如 ISBN 9780375811746《Flipped》）的扫码/封面识别结果，新增 LLM 中文翻译，并落库缓存避免重复调用。
+
+#### 后端翻译服务
+- `backend/src/modules/book/translation.service.ts`（新增）：
+  - 封装 OpenAI 兼容 LLM 调用，将 `title/author/publisher/summary` 翻译成中文。
+  - 提供 `shouldTranslate(language, sampleText)` 判断是否需要翻译（非中文内容才触发）。
+  - 超时 120 秒，支持解析 LLM 返回的非标准 JSON。
+- `backend/src/modules/book/book-library.service.ts`：
+  - 新增 `updateTranslation(isbn, translation)` 方法，将中文结果写入 `BookLibraryItem`。
+  - `toDto`/`upsertOne` 暴露和更新中文字段。
+- `backend/src/modules/book/book.controller.ts`：
+  - `POST /books/cover/recognize`：对前 5 条候选图书并行翻译，并缓存到书库。
+  - `GET /books/library/:isbn`：详情页查询时优先返回已缓存中文翻译，未命中时调用 LLM 翻译并落库。
+
+#### 数据库迁移
+- `backend/prisma/schema.prisma`：在 `BookLibraryItem` 模型新增：
+  - `titleZh` / `authorZh` / `publisherZh` / `summaryZh`
+- 已执行迁移并在本地/线上数据库落库。
+
+#### 前端中文展示
+- `frontend/src/pages/ScanCover.tsx`：候选卡片优先显示中文书名、作者、出版社；保留英文原名作为副标题。
+- `frontend/src/pages/BookDetail.tsx`：详情页标题、作者、出版社、简介优先展示中文，英文原样保留。
+
+#### 测试与质量门禁
+- `backend/test/book.controller.cover-search.spec.ts`、`backend/test/book.controller.cover-resolve.spec.ts`：补充 `TranslationService` mock，修复构建失败。
+- `frontend/vitest.config.ts`：将 `react-router` / `react-router-dom` 的 alias 改为动态 `require.resolve`，避免 pnpm 依赖结构变化后硬编码路径失效。
+
+#### 本地验证
+- 访问 `http://127.0.0.1:8080/scan`，识别 ISBN 9780375811746（《Flipped》）：
+  - 中文书名：`怦然心动`
+  - 作者：`温德琳·范·德拉安南 / Wendelin Van Draanen`
+  - 出版社：`兰登书屋儿童图书部 / Random House Children's Books`
+  - 简介：完整中文摘要已展示并落库。
+- 详情页 `http://127.0.0.1:8080/books/9780375811746` 同样展示中文元数据。
+
+#### 线上配置
+- Render 服务 `podcast-platform-backend` 需手动添加环境变量 `LLM_VISION_API_KEY`，配置完成后重新部署，线上 `/scan` 即可使用封面视觉识别。
+
+#### 验证结果
+| 检查项 | 命令 | 结果 |
+|--------|------|------|
+| 后端测试 | `pnpm --filter backend test` | 22 suites passed, 121 tests passed |
+| 后端 lint | `eslint . --ext .ts` | 0 errors, 0 warnings |
+| 后端类型检查 | `pnpm --filter backend exec tsc --noEmit` | passed |
+| 前端测试 | `pnpm --filter frontend test` | 19 suites passed, 198 tests passed |
+| 前端 lint | `eslint . --ext .ts,.tsx` | 0 errors, 0 warnings |
+| 前端构建 | `pnpm --filter frontend build` | tsc -b && vite build passed |
+
+#### 版本号
+- root / frontend / backend 统一升级到 `0.6.3`。
+
+---
+
 ## [0.6.2] - 2026-07-06
 
 ### 修改时间

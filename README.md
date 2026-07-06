@@ -1,7 +1,7 @@
 # Podcast Platform
 
 > ISBN → AI Podcast 一站式自动生产平台。
-> 当前版本：**v0.6.2**（拍照找书快速定位优化）
+> 当前版本：**v0.6.3**（图书识别结果中文翻译与持久化）
 > 完整 PRD 见 `docs/podcast-platform-prd.md`；架构见 `docs/podcast-platform-architecture.md`。
 > 变更日志见 [`CHANGELOG.md`](CHANGELOG.md)。
 
@@ -16,17 +16,24 @@
 
 ## 部署
 
-本项目支持 **Vercel + Render 免费方案** 30 分钟从 0 上线。
+本项目支持三条部署路径：
+
+- **免费改善大陆访问**：Cloudflare Pages 免费前端 + Render Free 后端，适合先止血。
+- **Vercel + Render 免费方案**：原始免费部署，海外访问可以，大陆访问不稳定。
+- **不备案海外 VPS 单机部署**：香港/新加坡 VPS，适合后端也要更稳时。
 
 详细 step-by-step 指南：[docs/deploy.md](docs/deploy.md)
+免费改善大陆访问：[docs/free-china-access-options.md](docs/free-china-access-options.md)
+不备案香港/新加坡部署：[docs/no-icp-overseas-deploy.md](docs/no-icp-overseas-deploy.md)
 质量闭环与部署交接文档：[docs/ai-podcast-quality-handoff.md](docs/ai-podcast-quality-handoff.md)
 
-- **frontend**: <https://vercel.com>（Hobby free tier）
+- **frontend**: <https://pages.cloudflare.com>（Free tier，推荐大陆访问先试）
 - **backend**: <https://render.com>（Free tier + Docker）
 
 > ⚠️ **生产环境注意**：
 > - Render free tier 文件系统是 ephemeral（重启即清空），导出的 MP3 需在 24h 内下载，真实业务测试建议使用 OSS/S3。
 > - Render Free Postgres 30 天过期，真实业务测试建议使用 Neon / Supabase / Render paid Postgres。
+> - Cloudflare Pages 免费方案使用 `VITE_API_BASE_URL=/api` + `BACKEND_URL=https://<your-backend>.onrender.com`。
 > - Vercel 部署时必须设置 `VITE_API_BASE_URL=https://<your-backend>.onrender.com`，不再依赖 rewrite 代理。
 
 ## 快速开始

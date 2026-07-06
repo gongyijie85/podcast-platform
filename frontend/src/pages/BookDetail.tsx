@@ -149,9 +149,17 @@ export function BookDetail(): JSX.Element {
                   />
                 )}
                 <Box>
-                  <Typography variant="h5" component="h1">{book.title}</Typography>
+                  <Typography variant="h5" component="h1">
+                    {book.titleZh || book.title}
+                  </Typography>
+                  {book.titleZh && book.titleZh !== book.title && (
+                    <Typography variant="body2" color="text.secondary">
+                      {book.title}
+                    </Typography>
+                  )}
                   <Typography variant="body1" color="text.secondary">
-                    {book.author}
+                    {book.authorZh || book.author}
+                    {book.authorZh && book.authorZh !== book.author ? ` / ${book.author}` : ''}
                   </Typography>
                 </Box>
                 <Stack direction="row" spacing={1} flexWrap="wrap" aria-label="图书标签">
@@ -175,8 +183,11 @@ export function BookDetail(): JSX.Element {
                   <Typography variant="body2">
                     ISBN：{book.isbn}
                   </Typography>
-                  {book.publisher && (
-                    <Typography variant="body2">出版社：{book.publisher}</Typography>
+                  {(book.publisher || book.publisherZh) && (
+                    <Typography variant="body2">
+                      出版社：{book.publisherZh || book.publisher}
+                      {book.publisherZh && book.publisherZh !== book.publisher ? ` / ${book.publisher}` : ''}
+                    </Typography>
                   )}
                   {book.publishedDate && (
                     <Typography variant="body2">出版日期：{book.publishedDate}</Typography>
@@ -186,14 +197,19 @@ export function BookDetail(): JSX.Element {
                   )}
                 </Box>
 
-                {book.summary && (
+                {(book.summaryZh || book.summary) && (
                   <Box component="section" aria-label="图书简介">
                     <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                       简介
                     </Typography>
                     <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                      {book.summary}
+                      {book.summaryZh || book.summary}
                     </Typography>
+                    {book.summaryZh && book.summaryZh !== book.summary && (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                        原文：{book.summary}
+                      </Typography>
+                    )}
                   </Box>
                 )}
 

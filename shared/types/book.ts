@@ -9,6 +9,10 @@ export interface BookMetadata {
   publishedDate?: string | null;
   pageCount?: number | null;
   source: 'openlibrary' | 'googlebooks' | 'mock' | 'bookrank';
+  titleZh?: string | null;
+  authorZh?: string | null;
+  publisherZh?: string | null;
+  summaryZh?: string | null;
 }
 
 export type BookMetadataSyncStatus = 'pending' | 'syncing' | 'synced' | 'partial' | 'failed';

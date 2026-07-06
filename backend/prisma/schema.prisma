@@ -102,6 +102,10 @@ model BookLibraryItem {
   publisher     String?
   publishedDate String?  @map("published_date")
   pageCount     Int?     @map("page_count")
+  titleZh       String?  @map("title_zh")
+  authorZh      String?  @map("author_zh")
+  publisherZh   String?  @map("publisher_zh")
+  summaryZh     String?  @db.Text @map("summary_zh")
   source        String
   category      String?
   categoryName  String?  @map("category_name")

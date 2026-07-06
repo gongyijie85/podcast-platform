@@ -1,11 +1,12 @@
 {
   "name": "frontend",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc -b && vite build",
+    "deploy:cloudflare": "pnpm build && npx wrangler pages deploy dist",
     "preview": "vite preview --host 0.0.0.0 --port 5173",
     "lint": "eslint . --ext .ts,.tsx",
     "test": "vitest run",

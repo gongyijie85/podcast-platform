@@ -5,10 +5,16 @@ describe('BookController.searchCoverCandidates', () => {
   const library = {
     findByIsbn: jest.fn(),
     list: jest.fn(),
+    upsertMany: jest.fn(),
+    updateTranslation: jest.fn(),
   };
   const googleBooks = {
     fetchByIsbn: jest.fn(),
     searchByTitle: jest.fn(),
+  };
+  const translation = {
+    shouldTranslate: jest.fn().mockReturnValue(false),
+    translateBook: jest.fn().mockResolvedValue({}),
   };
 
   function buildController(): BookController {
@@ -18,13 +24,16 @@ describe('BookController.searchCoverCandidates', () => {
       {} as never,
       {} as never,
       {} as never,
+      translation as never,
       googleBooks as never,
       {} as never,
     );
   }
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+    translation.shouldTranslate.mockReturnValue(false);
+    translation.translateBook.mockResolvedValue({});
   });
 
   it('throws BadRequestException when title is missing', async () => {
@@ -44,6 +53,10 @@ describe('BookController.searchCoverCandidates', () => {
           publisher: null,
           publishedDate: null,
           pageCount: null,
+          titleZh: null,
+          authorZh: null,
+          publisherZh: null,
+          summaryZh: null,
         },
       ],
       total: 1,
@@ -51,6 +64,7 @@ describe('BookController.searchCoverCandidates', () => {
       pageSize: 5,
     });
     googleBooks.searchByTitle.mockResolvedValue([]);
+    library.upsertMany.mockResolvedValue([]);
 
     const controller = buildController();
     const result = await controller.searchCoverCandidates('Pragmatic');
@@ -77,17 +91,44 @@ describe('BookController.searchCoverCandidates', () => {
         source: 'googlebooks',
       },
     ]);
+    library.upsertMany.mockResolvedValue([
+      {
+        id: 'book-1',
+        isbn: '9780135957059',
+        title: 'The Pragmatic Programmer',
+        author: 'Andrew Hunt',
+        coverUrl: null,
+        summary: null,
+        publisher: null,
+        publishedDate: null,
+        pageCount: null,
+        titleZh: null,
+        authorZh: null,
+        publisherZh: null,
+        summaryZh: null,
+        source: 'googlebooks',
+        queryCount: 1,
+        metadataSyncStatus: 'synced',
+        metadataSyncAttempts: 0,
+        firstSeenAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+      },
+    ]);
 
     const controller = buildController();
     const result = await controller.searchCoverCandidates('Pragmatic Programmer');
 
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0].isbn).toBe('9780135957059');
+    expect(library.upsertMany).toHaveBeenCalledWith([
+      expect.objectContaining({ isbn: '9780135957059', source: 'googlebooks' }),
+    ]);
   });
 
   it('returns empty candidates when no matches found', async () => {
     library.list.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 5 });
     googleBooks.searchByTitle.mockResolvedValue([]);
+    library.upsertMany.mockResolvedValue([]);
 
     const controller = buildController();
     const result = await controller.searchCoverCandidates('xyz-unknown');

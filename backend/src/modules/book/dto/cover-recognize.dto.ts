@@ -10,6 +10,10 @@ export interface CoverRecognizeCandidate {
   publisher?: string | null;
   publishedDate?: string | null;
   pageCount?: number | null;
+  titleZh?: string | null;
+  authorZh?: string | null;
+  publisherZh?: string | null;
+  summaryZh?: string | null;
 }
 
 /**

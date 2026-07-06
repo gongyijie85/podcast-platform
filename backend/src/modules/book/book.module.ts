@@ -8,6 +8,7 @@ import { BookLibraryService } from './book-library.service';
 import { BookLibrarySyncService } from './book-library-sync.service';
 import { CoverRecognizeService } from './cover-recognize.service';
 import { LivePitchService } from './live-pitch.service';
+import { TranslationService } from './translation.service';
 import { QueueModule } from '../queue/queue.module';
 
 @Module({
@@ -18,6 +19,7 @@ import { QueueModule } from '../queue/queue.module';
     BookLibrarySyncService,
     LivePitchService,
     CoverRecognizeService,
+    TranslationService,
     OpenLibraryAdapter,
     GoogleBooksAdapter,
     BookRankAdapter,
@@ -29,6 +31,7 @@ import { QueueModule } from '../queue/queue.module';
     BookLibrarySyncService,
     LivePitchService,
     CoverRecognizeService,
+    TranslationService,
     OpenLibraryAdapter,
     GoogleBooksAdapter,
   ],

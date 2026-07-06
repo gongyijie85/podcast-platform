@@ -16,6 +16,13 @@ const reactDomClientPath = rtlRequire.resolve('react-dom/client');
 const reactJsxRuntimePath = rtlRequire.resolve('react/jsx-runtime');
 const reactJsxDevRuntimePath = rtlRequire.resolve('react/jsx-dev-runtime');
 
+// 在 pnpm workspace 中通过真实包解析 react-router 的 ESM 入口，避免硬编码
+// ../node_modules/... 在依赖结构变化后失效。
+const reactRouterDomPkg = require.resolve('react-router-dom/package.json');
+const reactRouterDomRequire = createRequire(reactRouterDomPkg);
+const reactRouterPath = reactRouterDomRequire.resolve('react-router/dist/index.js');
+const reactRouterDomPath = reactRouterDomRequire.resolve('react-router-dom/dist/index.js');
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -30,8 +37,8 @@ export default defineConfig({
       { find: /^react\/jsx-dev-runtime$/, replacement: reactJsxDevRuntimePath },
       // react-router 的 main 字段指向 CJS，CJS 在 dev 环境会回退到 UMD，UMD 会自己再加载一份 React。
       // 强制使用 ESM 版本，确保它与测试代码共享同一份 React dispatcher。
-      { find: /^react-router$/, replacement: path.resolve(__dirname, '../node_modules/react-router/dist/index.js') },
-      { find: /^react-router-dom$/, replacement: path.resolve(__dirname, '../node_modules/react-router-dom/dist/index.js') },
+      { find: /^react-router$/, replacement: reactRouterPath },
+      { find: /^react-router-dom$/, replacement: reactRouterDomPath },
     ],
   },
   // 禁止 externalize React 生态库，避免被加载成 UMD/CJS 后内部又引入另一份 React。

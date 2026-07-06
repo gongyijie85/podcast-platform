@@ -303,14 +303,26 @@ export function ScanCover(): JSX.Element {
                       />
                     )}
                     <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
-                      <Typography variant="h6" component="h2" noWrap>{book.title}</Typography>
-                      <Typography variant="body2" color="text.secondary" noWrap>{book.author}</Typography>
-                      {book.publisher && (
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          {book.publisher}{book.publishedDate ? ` · ${book.publishedDate}` : ''}
+                      <Typography variant="h6" component="h2" noWrap>
+                        {book.titleZh || book.title}
+                      </Typography>
+                      {book.titleZh && book.titleZh !== book.title && (
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                          {book.title}
                         </Typography>
                       )}
-                      {book.summary && (
+                      <Typography variant="body2" color="text.secondary" noWrap>
+                        {book.authorZh || book.author}
+                        {book.authorZh && book.authorZh !== book.author ? ` / ${book.author}` : ''}
+                      </Typography>
+                      {(book.publisher || book.publisherZh) && (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {book.publisherZh || book.publisher}
+                          {book.publisherZh && book.publisherZh !== book.publisher ? ` / ${book.publisher}` : ''}
+                          {book.publishedDate ? ` · ${book.publishedDate}` : ''}
+                        </Typography>
+                      )}
+                      {(book.summaryZh || book.summary) && (
                         <Typography
                           variant="body2"
                           sx={{
@@ -321,7 +333,7 @@ export function ScanCover(): JSX.Element {
                             overflow: 'hidden',
                           }}
                         >
-                          {book.summary}
+                          {book.summaryZh || book.summary}
                         </Typography>
                       )}
                       <Typography variant="button" color="primary" sx={{ mt: 1, display: 'block' }}>
