@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "0.6.0",
+  "version": "0.6.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -21,6 +21,7 @@
     "@tiptap/extension-placeholder": "^2.6.6",
     "@tiptap/react": "^2.6.6",
     "@tiptap/starter-kit": "^2.6.6",
+    "@zxing/browser": "^0.2.0",
     "axios": "^1.7.4",
     "axios-retry": "^4.4.0",
     "clsx": "^2.1.1",

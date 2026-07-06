@@ -389,7 +389,7 @@ export function ProjectDetail(): JSX.Element {
           </IconButton>
         </Tooltip>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="h5" fontWeight={700} noWrap>
+          <Typography variant="h5" fontWeight={700} sx={{ wordBreak: 'break-word' }}>
             {p.title}
           </Typography>
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
@@ -765,7 +765,7 @@ export function ProjectDetail(): JSX.Element {
               sx={{
                 display: 'grid',
                 gap: 2,
-                gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
               }}
             >
               {p.bgmConfigs.map((b) => (
@@ -857,12 +857,19 @@ export function ProjectDetail(): JSX.Element {
           <Card variant="outlined">
             <CardContent>
               <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>⬇ 下载</Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={1}
+                alignItems={{ xs: 'stretch', sm: 'flex-start' }}
+                flexWrap="wrap"
+              >
                 <Button
                   variant="contained"
                   startIcon={<LinkIcon />}
                   onClick={() => void onCreateShare()}
                   disabled={p.status !== 'done' && p.status !== 'partial'}
+                  fullWidth
+                  sx={{ width: { sm: 'auto' } }}
                 >
                   生成分享链接
                 </Button>
@@ -873,11 +880,13 @@ export function ProjectDetail(): JSX.Element {
                     startIcon={<DownloadIcon />}
                     onClick={() => download(item.format)}
                     disabled={p.status !== 'done' && p.status !== 'partial'}
+                    fullWidth
+                    sx={{ width: { sm: 'auto' } }}
                   >
                     {item.label}
                   </Button>
                 ))}
-              </Box>
+              </Stack>
               {shareUrl && (
                 <Alert severity="success" sx={{ mt: 2 }}>
                   分享链接：{shareUrl}

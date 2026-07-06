@@ -4,12 +4,34 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   recognizeCover: vi.fn(),
+  resolveCoverByIsbn: vi.fn(),
+  searchCoverCandidates: vi.fn(),
+}));
+
+const scanIsbnMock = vi.hoisted(() => vi.fn());
+
+const scanHistoryMock = vi.hoisted(() => ({
+  getScanHistory: vi.fn(),
+  addScanHistory: vi.fn(),
+  clearScanHistory: vi.fn(),
 }));
 
 vi.mock('@/api/book.api', () => ({
   bookApi: {
     recognizeCover: mocks.recognizeCover,
+    resolveCoverByIsbn: mocks.resolveCoverByIsbn,
+    searchCoverCandidates: mocks.searchCoverCandidates,
   },
+}));
+
+vi.mock('@/utils/barcode-scanner', () => ({
+  scanIsbnFromImage: scanIsbnMock,
+}));
+
+vi.mock('@/utils/scan-history', () => ({
+  getScanHistory: scanHistoryMock.getScanHistory,
+  addScanHistory: scanHistoryMock.addScanHistory,
+  clearScanHistory: scanHistoryMock.clearScanHistory,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -20,13 +42,20 @@ vi.mock('react-i18next', () => ({
         'scan.subtitle': '直播时拍一下封面，自动显示口播稿',
         'scan.button': '拍照 / 上传封面',
         'scan.recognizing': '正在识别封面...',
+        'scan.compressing': '正在压缩图片...',
+        'scan.scanningBarcode': '正在扫描条码...',
         'scan.candidates': `识别到 ${opts?.count ?? 0} 本候选图书，请选择`,
         'scan.noResults': '未识别到匹配图书',
         'scan.recognizeFailed': '识别失败，请重试或手动输入书名',
         'scan.manualInput': '手动输入书名',
         'scan.manualInputPlaceholder': '输入书名后回车搜索',
+        'scan.manualSearchFailed': '手动搜索失败，请稍后重试',
         'scan.tip': '识别准确率取决于封面清晰度，建议正面拍摄',
         'scan.selectCandidate': '选择此书',
+        'scan.frameHint': '请将书背面的 ISBN 条码对准此区域，保持光线充足、条码清晰',
+        'scan.lowConfidence': '识别结果不确定',
+        'scan.recentHistory': '最近识别',
+        'scan.clearHistory': '清空历史',
         'common.search': '搜索',
       };
       return map[key] ?? key;
@@ -51,6 +80,8 @@ function renderScan(): void {
 describe('ScanCover', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    scanIsbnMock.mockReset();
+    scanHistoryMock.getScanHistory.mockReturnValue([]);
     vi.spyOn(window, 'alert').mockImplementation(() => {});
   });
 
@@ -162,5 +193,224 @@ describe('ScanCover', () => {
     await waitFor(() => {
       expect(screen.queryByText('正在识别封面...')).not.toBeInTheDocument();
     });
+  });
+
+  it('renders frame hint for better shooting guidance', () => {
+    renderScan();
+    expect(screen.getByText('请将书背面的 ISBN 条码对准此区域，保持光线充足、条码清晰')).toBeInTheDocument();
+  });
+
+  it('shows low confidence warning when recognition is uncertain', async () => {
+    mocks.recognizeCover.mockResolvedValueOnce({
+      candidates: [
+        {
+          isbn: '9780135957059',
+          title: 'The Pragmatic Programmer',
+          author: 'Andrew Hunt',
+          coverUrl: 'https://example.com/cover.jpg',
+          summary: 'A book about pragmatic programming.',
+          publisher: 'Addison-Wesley',
+          publishedDate: '2019',
+        },
+      ],
+      rawRecognition: {
+        title: 'The Pragmatic Programmer',
+        author: 'Andrew Hunt',
+        confidence: 'low',
+      },
+    });
+
+    renderScan();
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      value: [new File(['fake'], 'cover.jpg', { type: 'image/jpeg' })],
+      writable: false,
+    });
+    fireEvent.change(input);
+
+    await waitFor(() => {
+      expect(screen.getByText('识别结果不确定')).toBeInTheDocument();
+    });
+  });
+
+  it('shows scanning barcode state before recognition', async () => {
+    scanIsbnMock.mockResolvedValue(null);
+    mocks.recognizeCover.mockResolvedValueOnce({ candidates: [], rawRecognition: null });
+
+    renderScan();
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      value: [new File(['fake'], 'cover.jpg', { type: 'image/jpeg' })],
+      writable: false,
+    });
+    fireEvent.change(input);
+
+    await waitFor(() => {
+      expect(screen.getByText('正在扫描条码...')).toBeInTheDocument();
+    });
+  });
+
+  it('uses ISBN resolve when barcode is detected', async () => {
+    scanIsbnMock.mockResolvedValue('9780135957059');
+    mocks.resolveCoverByIsbn.mockResolvedValueOnce({
+      candidates: [
+        {
+          isbn: '9780135957059',
+          title: 'The Pragmatic Programmer',
+          author: 'Andrew Hunt',
+        },
+      ],
+      rawRecognition: { isbn: '9780135957059', confidence: 'high' },
+    });
+
+    renderScan();
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      value: [new File(['fake'], 'cover.jpg', { type: 'image/jpeg' })],
+      writable: false,
+    });
+    fireEvent.change(input);
+
+    await waitFor(() => {
+      expect(screen.getByText('The Pragmatic Programmer')).toBeInTheDocument();
+    });
+    expect(mocks.resolveCoverByIsbn).toHaveBeenCalledWith('9780135957059');
+    expect(mocks.recognizeCover).not.toHaveBeenCalled();
+  });
+
+  it('falls back to cover recognition when barcode is not detected', async () => {
+    scanIsbnMock.mockResolvedValue(null);
+    mocks.recognizeCover.mockResolvedValueOnce({
+      candidates: [
+        {
+          isbn: '9780135957059',
+          title: 'The Pragmatic Programmer',
+          author: 'Andrew Hunt',
+        },
+      ],
+      rawRecognition: { title: 'The Pragmatic Programmer' },
+    });
+
+    renderScan();
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      value: [new File(['fake'], 'cover.jpg', { type: 'image/jpeg' })],
+      writable: false,
+    });
+    fireEvent.change(input);
+
+    await waitFor(() => {
+      expect(screen.getByText('The Pragmatic Programmer')).toBeInTheDocument();
+    });
+    expect(mocks.recognizeCover).toHaveBeenCalledTimes(1);
+    expect(mocks.resolveCoverByIsbn).not.toHaveBeenCalled();
+  });
+
+  it('shows manual search candidates without navigation', async () => {
+    mocks.searchCoverCandidates.mockResolvedValueOnce({
+      candidates: [
+        {
+          isbn: '9780135957059',
+          title: 'The Pragmatic Programmer',
+          author: 'Andrew Hunt',
+        },
+      ],
+      rawRecognition: { title: 'The Pragmatic Programmer' },
+    });
+
+    renderScan();
+
+    const textField = screen.getByPlaceholderText('输入书名后回车搜索');
+    fireEvent.change(textField, { target: { value: 'Pragmatic' } });
+    fireEvent.click(screen.getByText('搜索'));
+
+    await waitFor(() => {
+      expect(screen.getByText('The Pragmatic Programmer')).toBeInTheDocument();
+    });
+    expect(mocks.searchCoverCandidates).toHaveBeenCalledWith('Pragmatic');
+  });
+
+  it('shows no results message after manual search returns empty', async () => {
+    mocks.searchCoverCandidates.mockResolvedValueOnce({ candidates: [], rawRecognition: null });
+
+    renderScan();
+
+    const textField = screen.getByPlaceholderText('输入书名后回车搜索');
+    fireEvent.change(textField, { target: { value: 'xyz-unknown' } });
+    fireEvent.click(screen.getByText('搜索'));
+
+    await waitFor(() => {
+      expect(screen.getByText('未识别到匹配图书')).toBeInTheDocument();
+    });
+  });
+
+  it('shows error message when manual search fails', async () => {
+    mocks.searchCoverCandidates.mockRejectedValueOnce(new Error('network error'));
+
+    renderScan();
+
+    const textField = screen.getByPlaceholderText('输入书名后回车搜索');
+    fireEvent.change(textField, { target: { value: 'Pragmatic' } });
+    fireEvent.click(screen.getByText('搜索'));
+
+    await waitFor(() => {
+      expect(screen.getByText('手动搜索失败，请稍后重试')).toBeInTheDocument();
+    });
+  });
+
+  it('shows recent scan history on render', () => {
+    scanHistoryMock.getScanHistory.mockReturnValue([
+      { isbn: '9780135957059', title: 'The Pragmatic Programmer', author: 'Andrew Hunt', scannedAt: '2024-01-01' },
+    ]);
+
+    renderScan();
+
+    expect(screen.getByText('最近识别')).toBeInTheDocument();
+    expect(screen.getByText('The Pragmatic Programmer')).toBeInTheDocument();
+    expect(screen.getByText('清空历史')).toBeInTheDocument();
+  });
+
+  it('saves first candidate to history after successful recognition', async () => {
+    mocks.recognizeCover.mockResolvedValueOnce({
+      candidates: [
+        {
+          isbn: '9780135957059',
+          title: 'The Pragmatic Programmer',
+          author: 'Andrew Hunt',
+        },
+      ],
+      rawRecognition: { title: 'The Pragmatic Programmer', author: 'Andrew Hunt' },
+    });
+
+    renderScan();
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      value: [new File(['fake'], 'cover.jpg', { type: 'image/jpeg' })],
+      writable: false,
+    });
+    fireEvent.change(input);
+
+    await waitFor(() => {
+      expect(screen.getByText('The Pragmatic Programmer')).toBeInTheDocument();
+    });
+    expect(scanHistoryMock.addScanHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ isbn: '9780135957059', title: 'The Pragmatic Programmer' }),
+    );
+  });
+
+  it('clears history when clear button clicked', () => {
+    scanHistoryMock.getScanHistory.mockReturnValue([
+      { isbn: '9780135957059', title: 'The Pragmatic Programmer', author: 'Andrew Hunt', scannedAt: '2024-01-01' },
+    ]);
+
+    renderScan();
+
+    fireEvent.click(screen.getByText('清空历史'));
+    expect(scanHistoryMock.clearScanHistory).toHaveBeenCalled();
   });
 });

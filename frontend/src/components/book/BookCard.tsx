@@ -132,8 +132,8 @@ export function BookCard({
               variant="rounded"
               src={book.coverUrl ?? undefined}
               sx={{
-                width: isList ? 76 : 64,
-                height: isList ? 108 : 88,
+                width: isList ? { xs: 64, sm: 76 } : 64,
+                height: isList ? { xs: 88, sm: 108 } : 88,
                 bgcolor: '#eef2ff',
                 color: 'primary.main',
                 borderRadius: 1,
@@ -291,7 +291,8 @@ export function BookCard({
               size="small"
               variant={selected ? 'outlined' : 'contained'}
               onClick={() => onUse(book)}
-              sx={{ whiteSpace: 'nowrap', minWidth: 88 }}
+              fullWidth
+              sx={{ whiteSpace: 'nowrap', minWidth: 88, width: { sm: 'auto' } }}
             >
               {selected ? '已选' : (useLabel ?? '使用此书')}
             </Button>

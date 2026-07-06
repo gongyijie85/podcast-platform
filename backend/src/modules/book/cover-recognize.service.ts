@@ -10,16 +10,27 @@ type AgnesChatResponse = {
 };
 
 /**
- * 识别结果（书名+作者）
+ * 识别结果
+ * - title/author 为封面主文字
+ * - isbn 优先从封底条码读取，可作为唯一标识快速定位
+ * - publisher/publishedYear/language 辅助排序与过滤
+ * - confidence 供前端提示用户识别可信度
  */
 export interface CoverRecognition {
   title: string;
   author?: string;
+  isbn?: string;
+  publisher?: string;
+  publishedYear?: string;
+  language?: string;
+  confidence?: 'high' | 'medium' | 'low' | 'unknown';
 }
 
 const RECOGNIZE_PROMPT =
-  '请识别图书封面上的书名和作者，返回严格 JSON 格式 {"title": "书名", "author": "作者"}。' +
-  '外文书请保留原文不要翻译。无法识别时返回 {"title": "", "author": ""}。' +
+  '请识别图书封面图片。尽可能读取封面上的书名、作者、ISBN、出版社、出版年份、语种。' +
+  'ISBN 通常在封底条码位置，是 10 或 13 位数字，可能以 978 或 979 开头。' +
+  '返回严格 JSON 格式 {"title":"书名","author":"作者","isbn":"ISBN或空","publisher":"出版社或空","publishedYear":"年份或空","language":"语种或空","confidence":"high|medium|low|unknown"}。' +
+  '外文书请保留原文不要翻译。无法识别时返回 {"title":"","author":"","isbn":"","publisher":"","publishedYear":"","language":"","confidence":"unknown"}。' +
   '只返回 JSON，不要加任何解释或代码块标记。';
 
 /**
@@ -93,6 +104,7 @@ export class CoverRecognizeService {
 
   /**
    * 解析 agnes 返回的 JSON（兼容 ```json 代码块包裹）
+   * 提取书名、作者、ISBN、出版社、出版年份、语种和置信度
    */
   private parseRecognition(content: string): CoverRecognition | null {
     const cleaned = content
@@ -102,14 +114,47 @@ export class CoverRecognizeService {
       .trim();
 
     try {
-      const parsed = JSON.parse(cleaned) as { title?: unknown; author?: unknown };
+      const parsed = JSON.parse(cleaned) as Record<string, unknown>;
       const title = typeof parsed.title === 'string' ? parsed.title.trim() : '';
-      const author = typeof parsed.author === 'string' ? parsed.author.trim() : '';
       if (!title) return null;
-      return { title, author: author || undefined };
+
+      const author = typeof parsed.author === 'string' ? parsed.author.trim() : '';
+      const isbn = this.cleanIsbn(parsed.isbn);
+      const publisher = typeof parsed.publisher === 'string' ? parsed.publisher.trim() : '';
+      const publishedYear = typeof parsed.publishedYear === 'string' ? parsed.publishedYear.trim() : '';
+      const language = typeof parsed.language === 'string' ? parsed.language.trim() : '';
+      const confidence = this.parseConfidence(parsed.confidence);
+
+      return {
+        title,
+        author: author || undefined,
+        isbn: isbn || undefined,
+        publisher: publisher || undefined,
+        publishedYear: publishedYear || undefined,
+        language: language || undefined,
+        confidence,
+      };
     } catch {
       this.logger.warn(`agnes returned non-JSON content: ${cleaned.slice(0, 200)}`);
       return null;
     }
+  }
+
+  /**
+   * 清洗 ISBN：只保留 10 或 13 位数字（兼容末尾 X）
+   */
+  private cleanIsbn(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const cleaned = value.replace(/[-\s]/g, '').trim().toUpperCase();
+    if (/^\d{9}[\dX]$/.test(cleaned) || /^\d{13}$/.test(cleaned)) return cleaned;
+    return null;
+  }
+
+  /**
+   * 解析置信度，只允许枚举值，非法时返回 unknown
+   */
+  private parseConfidence(value: unknown): CoverRecognition['confidence'] {
+    if (value === 'high' || value === 'medium' || value === 'low') return value;
+    return 'unknown';
   }
 }

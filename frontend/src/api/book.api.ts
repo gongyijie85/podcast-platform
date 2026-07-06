@@ -30,11 +30,24 @@ export interface CoverRecognizeCandidate {
 }
 
 /**
+ * 封面识别返回的原始识别信息
+ */
+export interface CoverRawRecognition {
+  title: string;
+  author?: string;
+  isbn?: string;
+  publisher?: string;
+  publishedYear?: string;
+  language?: string;
+  confidence?: 'high' | 'medium' | 'low' | 'unknown';
+}
+
+/**
  * 封面识别结果
  */
 export interface CoverRecognizeResult {
   candidates: CoverRecognizeCandidate[];
-  rawRecognition: { title: string; author?: string } | null;
+  rawRecognition: CoverRawRecognition | null;
 }
 
 export const bookApi = {
@@ -81,6 +94,30 @@ export const bookApi = {
   async listBgmCategories(): Promise<BgmCategory[]> {
     return request<BgmCategory[]>({ method: 'GET', url: '/bgm/categories' });
   },
+  /**
+   * 根据 ISBN 直接解析候选图书（条码扫描命中后快速定位）
+   * @param isbn 已归一化的 ISBN
+   */
+  async resolveCoverByIsbn(isbn: string): Promise<CoverRecognizeResult> {
+    return request<CoverRecognizeResult>({
+      method: 'POST',
+      url: '/books/cover/resolve-isbn',
+      data: { isbn },
+    });
+  },
+
+  /**
+   * 按书名搜索候选图书（/scan 页面就地搜索兜底）
+   * @param title 书名关键词
+   */
+  async searchCoverCandidates(title: string): Promise<CoverRecognizeResult> {
+    return request<CoverRecognizeResult>({
+      method: 'POST',
+      url: '/books/cover/search',
+      data: { title },
+    });
+  },
+
   /**
    * 上传封面图片，后端调 agnes-2.0-flash 识别 + Google Books 搜索候选
    * @param file 图片文件（JPEG/PNG，<=5MB）

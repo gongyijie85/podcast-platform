@@ -16,10 +16,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { BookService } from './book.service';
 import { BookRankImportDto, FetchMetadataDto, ResolveMetadataDto } from './dto/fetch-metadata.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
-import { CoverRecognizeResultDto } from './dto/cover-recognize.dto';
+import { CoverRecognizeResultDto, type CoverRecognizeCandidate, type CoverRawRecognition } from './dto/cover-recognize.dto';
 import { BookLibraryService } from './book-library.service';
 import { BookLibrarySyncService } from './book-library-sync.service';
-import { CoverRecognizeService } from './cover-recognize.service';
+import { CoverRecognizeService, type CoverRecognition } from './cover-recognize.service';
 import { GoogleBooksAdapter } from './adapters/google-books.adapter';
 import { LivePitchService } from './live-pitch.service';
 import { Public } from '../auth/public.decorator';
@@ -29,6 +29,7 @@ import type {
   BookLibraryListResult,
   BookLibrarySyncStartResult,
   BookLibrarySyncStatusResult,
+  BookMetadata,
   BookRankImportResult,
   GenerateLivePitchResult,
   ResolveMetadataResult,
@@ -68,8 +69,9 @@ export class BookController {
   }
 
   /**
-   * 拍照/上传封面 → agnes-2.0-flash 识别书名+作者 → Google Books 搜索候选
-   * 返回候选图书列表（最多 5 本）+ 原始识别结果（用于调试/兜底提示）
+   * 拍照/上传封面 → agnes-2.0-flash 识别封面信息 → 多渠道搜索候选
+   * 搜索优先级：ISBN 直连 → 本地书库 → Google Books
+   * 返回候选图书列表（最多 5 本）+ 原始识别结果（用于调试/兜底提示/置信度展示）
    */
   @Public()
   @Post('books/cover/recognize')
@@ -94,19 +96,199 @@ export class BookController {
       return { candidates: [], rawRecognition: null };
     }
 
-    const candidates = await this.googleBooks.searchByTitle(recognition.title, recognition.author);
+    const candidates = await this.resolveCandidates(recognition);
     return {
-      candidates: candidates.map((c) => ({
-        isbn: c.isbn,
-        title: c.title,
-        author: c.author,
-        coverUrl: c.coverUrl ?? null,
-        summary: c.summary ?? null,
-        publisher: c.publisher ?? null,
-        publishedDate: c.publishedDate ?? null,
-        pageCount: c.pageCount ?? null,
-      })),
-      rawRecognition: { title: recognition.title, author: recognition.author },
+      candidates: this.dedupeAndLimit(candidates, recognition),
+      rawRecognition: this.toRawRecognition(recognition),
+    };
+  }
+
+  /**
+   * 根据 ISBN 直接解析候选图书（用于前端条码扫描命中后快速定位）
+   * 优先级：本地书库 → Google Books
+   */
+  @Public()
+  @Post('books/cover/resolve-isbn')
+  async resolveCoverByIsbn(@Body('isbn') isbn: string): Promise<CoverRecognizeResultDto> {
+    if (!isbn || typeof isbn !== 'string') {
+      throw new BadRequestException('请提供 ISBN');
+    }
+
+    const recognition: CoverRecognition = {
+      title: '',
+      isbn: isbn.trim(),
+      confidence: 'high',
+    };
+
+    const candidates = await this.resolveCandidates(recognition);
+    return {
+      candidates: this.dedupeAndLimit(candidates, recognition),
+      rawRecognition: this.toRawRecognition(recognition),
+    };
+  }
+
+  /**
+   * 按书名手动搜索候选图书（用于 /scan 页面就地搜索兜底）
+   * 搜索范围：本地书库 → Google Books
+   */
+  @Public()
+  @Post('books/cover/search')
+  async searchCoverCandidates(@Body('title') title: string): Promise<CoverRecognizeResultDto> {
+    if (!title || typeof title !== 'string') {
+      throw new BadRequestException('请提供书名');
+    }
+
+    const recognition: CoverRecognition = {
+      title: title.trim(),
+      confidence: 'medium',
+    };
+
+    const candidates = await this.resolveCandidates(recognition);
+    return {
+      candidates: this.dedupeAndLimit(candidates, recognition),
+      rawRecognition: this.toRawRecognition(recognition),
+    };
+  }
+
+  /**
+   * 按 ISBN → 本地书库 → Google Books 的优先级解析候选图书
+   */
+  private async resolveCandidates(recognition: CoverRecognition): Promise<CoverRecognizeCandidate[]> {
+    const candidates: CoverRecognizeCandidate[] = [];
+
+    // 1. ISBN 直连：命中即唯一，速度最快、准确率最高
+    if (recognition.isbn) {
+      const localByIsbn = await this.library.findByIsbn(recognition.isbn);
+      if (localByIsbn) {
+        candidates.push(this.libraryItemToCandidate(localByIsbn));
+      } else {
+        const remoteByIsbn = await this.googleBooks.fetchByIsbn(recognition.isbn).catch(() => null);
+        if (remoteByIsbn) {
+          candidates.push(this.metadataToCandidate(remoteByIsbn));
+        }
+      }
+    }
+
+    // 2. 本地书库标题搜索：主播反复带货的书大概率已在书库
+    if (candidates.length === 0 && recognition.title) {
+      const localList = await this.library.list({ q: recognition.title, pageSize: 5 });
+      candidates.push(...localList.items.map((item) => this.libraryItemToCandidate(item)));
+    }
+
+    // 3. Google Books 兜底：用书名+作者搜索外部数据
+    if (candidates.length < 5 && recognition.title) {
+      const remote = await this.googleBooks.searchByTitle(recognition.title, recognition.author).catch(() => []);
+      candidates.push(...remote.map((item) => this.metadataToCandidate(item)));
+    }
+
+    return candidates;
+  }
+
+  /**
+   * 将本地书库条目转换为候选 DTO
+   */
+  private libraryItemToCandidate(item: BookLibraryItem): CoverRecognizeCandidate {
+    return {
+      isbn: item.isbn,
+      title: item.title,
+      author: item.author,
+      coverUrl: item.coverUrl ?? null,
+      summary: item.summary ?? null,
+      publisher: item.publisher ?? null,
+      publishedDate: item.publishedDate ?? null,
+      pageCount: item.pageCount ?? null,
+    };
+  }
+
+  /**
+   * 将 BookMetadata 转换为候选 DTO
+   */
+  private metadataToCandidate(item: BookMetadata): CoverRecognizeCandidate {
+    return {
+      isbn: item.isbn,
+      title: item.title,
+      author: item.author,
+      coverUrl: item.coverUrl ?? null,
+      summary: item.summary ?? null,
+      publisher: item.publisher ?? null,
+      publishedDate: item.publishedDate ?? null,
+      pageCount: item.pageCount ?? null,
+    };
+  }
+
+  /**
+   * 候选去重并按匹配度排序，最多返回 5 本
+   */
+  private dedupeAndLimit(candidates: CoverRecognizeCandidate[], recognition: CoverRecognition): CoverRecognizeCandidate[] {
+    const seen = new Set<string>();
+    const unique = candidates.filter((item) => {
+      if (seen.has(item.isbn)) return false;
+      seen.add(item.isbn);
+      return true;
+    });
+
+    const scored = unique.map((item) => ({
+      item,
+      score: this.scoreCandidate(item, recognition),
+    }));
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 5).map(({ item }) => item);
+  }
+
+  /**
+   * 候选匹配度打分：ISBN 命中权重最高，其次书名/作者/出版社/封面/简介
+   */
+  private scoreCandidate(item: CoverRecognizeCandidate, recognition: CoverRecognition): number {
+    let score = 0;
+    const title = recognition.title.toLowerCase();
+    const author = recognition.author?.toLowerCase() ?? '';
+    const publisher = recognition.publisher?.toLowerCase() ?? '';
+    const itemTitle = item.title.toLowerCase();
+    const itemAuthor = item.author.toLowerCase();
+    const itemPublisher = (item.publisher ?? '').toLowerCase();
+
+    // ISBN 完全匹配：最高权重
+    if (recognition.isbn && item.isbn === recognition.isbn) {
+      score += 100;
+    }
+
+    // 书名相似度
+    if (itemTitle === title) {
+      score += 50;
+    } else if (itemTitle.includes(title) || title.includes(itemTitle)) {
+      score += 30;
+    }
+
+    // 作者匹配
+    if (author && itemAuthor.includes(author)) {
+      score += 20;
+    }
+
+    // 出版社匹配
+    if (publisher && itemPublisher.includes(publisher)) {
+      score += 10;
+    }
+
+    // 有封面图和简介的优先
+    if (item.coverUrl) score += 5;
+    if (item.summary) score += 3;
+
+    return score;
+  }
+
+  /**
+   * 将服务层识别结果转换为 DTO 中的原始识别结果
+   */
+  private toRawRecognition(recognition: CoverRecognition): CoverRawRecognition {
+    return {
+      title: recognition.title,
+      author: recognition.author,
+      isbn: recognition.isbn,
+      publisher: recognition.publisher,
+      publishedYear: recognition.publishedYear,
+      language: recognition.language,
+      confidence: recognition.confidence,
     };
   }
 

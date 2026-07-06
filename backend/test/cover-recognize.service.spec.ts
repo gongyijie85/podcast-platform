@@ -48,7 +48,13 @@ describe('CoverRecognizeService', () => {
     });
     const svc = buildService();
     const result = await svc.recognize(Buffer.from('fake'), 'image/jpeg');
-    expect(result).toEqual({ title: 'The Pragmatic Programmer', author: 'Andrew Hunt' });
+    expect(result).toEqual(
+      expect.objectContaining({
+        title: 'The Pragmatic Programmer',
+        author: 'Andrew Hunt',
+        confidence: 'unknown',
+      }),
+    );
     expect(postMock).toHaveBeenCalledTimes(1);
     const [url, body] = postMock.mock.calls[0];
     expect(url).toContain('/chat/completions');
@@ -78,7 +84,13 @@ describe('CoverRecognizeService', () => {
     });
     const svc = buildService();
     const result = await svc.recognize(Buffer.from('fake'), 'image/png');
-    expect(result).toEqual({ title: 'Clean Code', author: 'Robert C. Martin' });
+    expect(result).toEqual(
+      expect.objectContaining({
+        title: 'Clean Code',
+        author: 'Robert C. Martin',
+        confidence: 'unknown',
+      }),
+    );
   });
 
   it('returns null when title is empty', async () => {
@@ -94,6 +106,38 @@ describe('CoverRecognizeService', () => {
     const svc = buildService();
     const result = await svc.recognize(Buffer.from('fake'), 'image/jpeg');
     expect(result).toBeNull();
+  });
+
+  it('parses extended fields including ISBN and confidence', async () => {
+    config.get.mockImplementation((key: string) => {
+      if (key === 'thirdParty.llmVision.apiKey') return 'k';
+      if (key === 'thirdParty.llmVision.endpoint') return 'https://agnes.test/v1';
+      if (key === 'thirdParty.llmVision.model') return 'agnes-2.0-flash';
+      return undefined;
+    });
+    postMock.mockResolvedValue({
+      data: {
+        choices: [
+          {
+            message: {
+              content:
+                '{"title":"The Creative Act","author":"Rick Rubin","isbn":"978-0-241-66215-1","publisher":"Penguin Press","publishedYear":"2023","language":"English","confidence":"high"}',
+            },
+          },
+        ],
+      },
+    });
+    const svc = buildService();
+    const result = await svc.recognize(Buffer.from('fake'), 'image/jpeg');
+    expect(result).toEqual({
+      title: 'The Creative Act',
+      author: 'Rick Rubin',
+      isbn: '9780241662151',
+      publisher: 'Penguin Press',
+      publishedYear: '2023',
+      language: 'English',
+      confidence: 'high',
+    });
   });
 
   it('returns null when agnes call throws', async () => {

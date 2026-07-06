@@ -131,7 +131,7 @@ export function BookDetail(): JSX.Element {
       </Button>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} lg={6}>
           <Card>
             <CardContent>
               <Stack spacing={2}>
@@ -140,7 +140,12 @@ export function BookDetail(): JSX.Element {
                     component="img"
                     src={book.coverUrl}
                     alt={`${book.title} 封面`}
-                    sx={{ maxWidth: 200, alignSelf: 'flex-start', borderRadius: 1 }}
+                    sx={{
+                      maxWidth: { xs: 160, sm: 200 },
+                      width: '100%',
+                      alignSelf: { xs: 'center', sm: 'flex-start' },
+                      borderRadius: 1,
+                    }}
                   />
                 )}
                 <Box>
@@ -214,7 +219,7 @@ export function BookDetail(): JSX.Element {
           </Card>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} lg={6}>
           <Card>
             <CardContent>
               <Stack spacing={2}>
@@ -237,13 +242,19 @@ export function BookDetail(): JSX.Element {
                   disabled={generating || saving}
                   aria-label="主播口播稿编辑框"
                 />
-                <Stack direction="row" spacing={1}>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1}
+                  alignItems={{ xs: 'stretch', sm: 'center' }}
+                >
                   <Button
                     variant="contained"
                     color="primary"
                     startIcon={<AutoFixHighIcon />}
                     onClick={handleGenerate}
                     disabled={generating || saving}
+                    fullWidth
+                    sx={{ width: { sm: 'auto' } }}
                   >
                     {generating ? t('bookDetail.generating') : t('bookDetail.generate')}
                   </Button>
@@ -252,6 +263,8 @@ export function BookDetail(): JSX.Element {
                     startIcon={<SaveIcon />}
                     onClick={handleSave}
                     disabled={generating || saving || !livePitch.trim()}
+                    fullWidth
+                    sx={{ width: { sm: 'auto' } }}
                   >
                     {saving ? t('bookDetail.saving') : t('bookDetail.save')}
                   </Button>

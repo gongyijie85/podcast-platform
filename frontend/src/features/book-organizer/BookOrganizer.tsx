@@ -609,7 +609,7 @@ export function BookOrganizer({
                           : warning
                             ? 'rgba(245, 158, 11, 0.08)'
                             : '#f8fafc',
-                        minHeight: 74,
+                        minHeight: { xs: 64, sm: 74 },
                       }}
                     >
                       <Stack
@@ -665,7 +665,7 @@ export function BookOrganizer({
             <Box
               sx={{
                 display: 'grid',
-                gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1.25fr) minmax(360px, 0.75fr)' },
+                gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1.25fr) minmax(320px, 0.75fr)' },
                 gap: 2,
                 alignItems: 'stretch',
               }}
@@ -685,7 +685,7 @@ export function BookOrganizer({
                 <Stack
                   direction={{ xs: 'column', md: 'row' }}
                   spacing={0}
-                  alignItems={{ md: 'center' }}
+                  alignItems={{ xs: 'stretch', md: 'center' }}
                   sx={{ gap: 1.25, flexWrap: 'wrap' }}
                 >
                   <TextField
@@ -709,7 +709,7 @@ export function BookOrganizer({
                     value={librarySource}
                     onChange={(event) => updateLibrarySource(event.target.value)}
                     SelectProps={{ native: true }}
-                    sx={{ flex: '0 1 150px', minWidth: 140 }}
+                    sx={{ flex: '0 1 150px', minWidth: { xs: '100%', md: 140 } }}
                   >
                     {SOURCE_FILTER_OPTIONS.map((option) => (
                       <option key={option.value || 'all'} value={option.value}>
@@ -724,7 +724,7 @@ export function BookOrganizer({
                     value={libraryCategory}
                     onChange={(event) => updateLibraryCategory(event.target.value)}
                     SelectProps={{ native: true }}
-                    sx={{ flex: '0 1 170px', minWidth: 150 }}
+                    sx={{ flex: '0 1 170px', minWidth: { xs: '100%', md: 150 } }}
                   >
                     <option value="">全部分类</option>
                     <option value="new-books">新书</option>
@@ -743,7 +743,7 @@ export function BookOrganizer({
                       updateLibrarySyncFilter(event.target.value as BookLibrarySyncStatusFilter | '')
                     }
                     SelectProps={{ native: true }}
-                    sx={{ flex: '0 1 160px', minWidth: 150 }}
+                    sx={{ flex: '0 1 160px', minWidth: { xs: '100%', md: 150 } }}
                   >
                     {SYNC_FILTER_OPTIONS.map((option) => (
                       <option key={option.value || 'all'} value={option.value}>
@@ -1178,7 +1178,11 @@ export function BookOrganizer({
             {selectedList.length > 0 ? '将按选择顺序进入本期播客内容。' : '勾选图书后可批量创建播客。'}
           </Typography>
         </Stack>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={1}
+          alignItems={{ xs: 'stretch', md: 'center' }}
+        >
           <Button
             size="small"
             variant="outlined"

@@ -4,7 +4,7 @@ import { Sidebar } from '../components/layout/Sidebar';
 import { Header } from '../components/layout/Header';
 import { Footer } from '../components/layout/Footer';
 import { useUiStore } from '../store/ui.store';
-import { useMobile } from '../hooks/useMediaQuery';
+import { useMobile, useTablet } from '../hooks/useMediaQuery';
 
 /**
  * Primary app shell: persistent left sidebar (collapsible), top bar, scrollable
@@ -13,18 +13,21 @@ import { useMobile } from '../hooks/useMediaQuery';
  */
 export function MainLayout(): JSX.Element {
   const isMobile = useMobile();
+  const isTablet = useTablet();
   const drawerOpen = useUiStore((s) => s.drawerOpen);
   const setDrawer = useUiStore((s) => s.setDrawer);
-  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
+  const uiSidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
+  // 平板自动折叠侧边栏，留出更多主内容空间；桌面端尊重用户手动设置。
+  const sidebarCollapsed = !isMobile && (isTablet || uiSidebarCollapsed);
 
   return (
     <Box className="app-shell" sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      {/* Sidebar: persistent on desktop, drawer on mobile */}
+      {/* Sidebar: persistent on desktop/tablet, drawer on mobile */}
       <Sidebar
         variant={isMobile ? 'temporary' : 'persistent'}
         open={isMobile ? drawerOpen : true}
         onClose={() => setDrawer(false)}
-        collapsed={!isMobile && sidebarCollapsed}
+        collapsed={sidebarCollapsed}
       />
 
       <Box

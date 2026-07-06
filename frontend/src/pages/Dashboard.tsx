@@ -115,6 +115,8 @@ export function Dashboard(): JSX.Element {
           size="large"
           startIcon={<AddCircleIcon />}
           onClick={() => navigate('/projects/new')}
+          fullWidth
+          sx={{ width: { sm: 'auto' } }}
         >
           {t('dashboard.newProject')}
         </Button>
