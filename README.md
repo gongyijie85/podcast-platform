@@ -1,7 +1,9 @@
 # Podcast Platform
 
 > ISBN → AI Podcast 一站式自动生产平台。
+> 当前版本：**v0.5.0**（质量运维审计整改闭环）
 > 完整 PRD 见 `docs/podcast-platform-prd.md`；架构见 `docs/podcast-platform-architecture.md`。
+> 变更日志见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ## 核心能力
 

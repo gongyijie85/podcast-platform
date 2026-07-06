@@ -3,7 +3,8 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { nanoid } from 'nanoid';
-import { QUEUE_NAMES, STAGE_WEIGHTS, Stage } from './constants';
+import { Counter, register } from 'prom-client';
+import { QUEUE_NAMES, STAGE_TO_QUEUE_NAME, STAGE_WEIGHTS, Stage } from './constants';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScriptService } from '../script/script.service';
 import { TtsService } from '../tts/tts.service';
@@ -12,11 +13,42 @@ import { MixService } from '../mix/mix.service';
 import type { ProgressEvent } from '@shared/job';
 import type { RegenerateProjectPayload } from '@shared/project';
 
+/**
+ * 获取或创建一个 Counter，避免测试或热重载时重复注册同名指标。
+ */
+function getOrCreateCounter(name: string, help: string, labelNames: string[]): Counter {
+  const existing = register.getSingleMetric(name) as Counter | undefined;
+  if (existing) {
+    return existing;
+  }
+  return new Counter({ name, help, labelNames });
+}
+
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
   private readonly localJobs = new Set<string>();
   private redisUnavailableUntil = 0;
+
+  /**
+   * BullMQ 队列指标：等待中、已完成、已失败
+   * 这些 Counter 按 queue（队列名）分 label，供 Prometheus 抓取。
+   */
+  private readonly queueWaitingCounter = getOrCreateCounter(
+    'bullmq_queue_waiting',
+    'Total number of jobs added to BullMQ queues',
+    ['queue'],
+  );
+  private readonly queueCompletedCounter = getOrCreateCounter(
+    'bullmq_queue_completed',
+    'Total number of jobs completed in BullMQ queues',
+    ['queue'],
+  );
+  private readonly queueFailedCounter = getOrCreateCounter(
+    'bullmq_queue_failed',
+    'Total number of jobs failed in BullMQ queues',
+    ['queue'],
+  );
 
   constructor(
     @InjectQueue(QUEUE_NAMES.METADATA) private readonly metadataQ: Queue,
@@ -209,6 +241,7 @@ export class QueueService {
         this.enqueueTimeoutMs(),
         `enqueue ${jobName}`,
       );
+      this.incWaiting(queue.name);
     } catch (error) {
       this.redisUnavailableUntil = Date.now() + 60_000;
       this.logger.warn(
@@ -243,6 +276,7 @@ export class QueueService {
     runner: () => Promise<unknown>,
     key: string,
   ): Promise<void> {
+    const queueName = STAGE_TO_QUEUE_NAME[stage];
     try {
       await this.prisma.project.update({
         where: { id: projectId },
@@ -253,6 +287,7 @@ export class QueueService {
         },
       }).catch(() => undefined);
       await runner();
+      this.incCompleted(queueName);
     } catch (error) {
       const message = (error as Error).message || 'local queue stage failed';
       this.logger.error(`Local ${stage} runner failed for project=${projectId}: ${message}`, (error as Error).stack);
@@ -268,9 +303,27 @@ export class QueueService {
         where: { id: projectId },
         data: { status: 'failed', currentStage: stage },
       }).catch(() => undefined);
+      this.incFailed(queueName);
     } finally {
       this.localJobs.delete(key);
     }
+  }
+
+  /**
+   * 记录队列事件指标，供 QueueModule 中的 QueueEvents 监听调用。
+   */
+  incWaiting(queue: string): void {
+    this.queueWaitingCounter.inc({ queue });
+  }
+  incCompleted(queue: string): void {
+    this.queueCompletedCounter.inc({ queue });
+  }
+  incFailed(queue: string): void {
+    this.queueFailedCounter.inc({ queue });
+  }
+
+  isRedisMode(): boolean {
+    return this.queueMode() === 'redis';
   }
 
   private shouldUseLocalQueue(): boolean {

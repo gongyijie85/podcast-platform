@@ -39,34 +39,34 @@ describe('ProjectService create metadata flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     config.get.mockReturnValue(20);
-    prisma.project.create.mockImplementation(({ data }: { data: any }) => ({
-      id: 'project-1',
-      userId: data.userId,
-      title: data.title,
-      coverUrl: data.coverUrl,
-      mode: data.mode,
-      scriptTemplate: data.scriptTemplate,
-      status: data.status,
-      progress: data.progress,
-      currentStage: data.currentStage,
-      createdAt: new Date('2026-06-16T00:00:00.000Z'),
-      updatedAt: new Date('2026-06-16T00:00:00.000Z'),
-      books: data.books.create.map((book: any, index: number) => ({
-        id: `book-${index}`,
-        projectId: 'project-1',
-        ...book,
-      })),
-      voices: data.voices.create.map((voice: any, index: number) => ({
-        id: `voice-${index}`,
-        projectId: 'project-1',
-        ...voice,
-      })),
-      bgmConfigs: data.bgmConfigs.create.map((bgm: any, index: number) => ({
-        id: `bgm-${index}`,
-        projectId: 'project-1',
-        ...bgm,
-      })),
-    }));
+    prisma.project.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => ({
+  id: 'project-1',
+  userId: data.userId,
+  title: data.title,
+  coverUrl: data.coverUrl,
+  mode: data.mode,
+  scriptTemplate: data.scriptTemplate,
+  status: data.status,
+  progress: data.progress,
+  currentStage: data.currentStage,
+  createdAt: new Date('2026-06-16T00:00:00.000Z'),
+  updatedAt: new Date('2026-06-16T00:00:00.000Z'),
+  books: data.books.create.map((book: Record<string, unknown>, index: number) => ({
+    id: `book-${index}`,
+    projectId: 'project-1',
+    ...book,
+  })),
+  voices: data.voices.create.map((voice: Record<string, unknown>, index: number) => ({
+    id: `voice-${index}`,
+    projectId: 'project-1',
+    ...voice,
+  })),
+  bgmConfigs: data.bgmConfigs.create.map((bgm: Record<string, unknown>, index: number) => ({
+    id: `bgm-${index}`,
+    projectId: 'project-1',
+    ...bgm,
+  })),
+}));
   });
 
   function service(): ProjectService {

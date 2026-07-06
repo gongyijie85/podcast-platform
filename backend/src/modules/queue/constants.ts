@@ -18,6 +18,14 @@ export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 export const STAGES = ['metadata', 'script', 'tts', 'subtitle', 'mix'] as const;
 export type Stage = (typeof STAGES)[number];
 
+export const STAGE_TO_QUEUE_NAME: Record<Stage, QueueName> = {
+  metadata: QUEUE_NAMES.METADATA,
+  script: QUEUE_NAMES.SCRIPT,
+  tts: QUEUE_NAMES.TTS,
+  subtitle: QUEUE_NAMES.SUBTITLE,
+  mix: QUEUE_NAMES.MIX,
+};
+
 export const STAGE_WEIGHTS: Record<Stage, number> = {
   metadata: 0,
   script: 25,

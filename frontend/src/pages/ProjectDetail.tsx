@@ -42,7 +42,6 @@ import LinkIcon from '@mui/icons-material/Link';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { Waveform } from '../components/player/Waveform';
 import { SubtitleOverlay } from '../components/player/SubtitleOverlay';
-import { ScriptEditor } from '../components/script/ScriptEditor';
 import { StepIndicator } from '../components/progress/StepIndicator';
 import { Loading } from '../components/common/Loading';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';

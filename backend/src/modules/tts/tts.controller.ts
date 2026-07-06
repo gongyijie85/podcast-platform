@@ -1,8 +1,7 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { TtsService } from './tts.service';
 import { TtsPreviewDto } from './dto/tts-voice.dto';
 import { Public } from '../auth/public.decorator';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import type { TtsVoice, TtsPreviewResult } from '@shared/book';
 
 @Controller('tts')

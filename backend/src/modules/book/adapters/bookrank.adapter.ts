@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { type AxiosInstance } from 'axios';
 import { normalizeIsbn } from '../../../common/utils/isbn';
-import type { BookLibraryItem, BookMetadata } from '@shared/book';
+import type { BookMetadata } from '@shared/book';
 
 interface BookRankBook {
   id?: string | number;

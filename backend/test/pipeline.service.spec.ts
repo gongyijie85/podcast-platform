@@ -31,6 +31,9 @@ import { LocalDiskStorageAdapter } from '../src/modules/export/adapters/local-di
 
 import type { ProgressEvent } from '@shared/pipeline';
 
+// Pipeline 测试会调用真实音频处理与文件 I/O，默认 5 秒超时不够。
+jest.setTimeout(30_000);
+
 // Path to the per-run scratch dir. We resolve relative to the test file
 // (`backend/test/...`) so the spec works from any working directory.
 const PIPELINE_TMP_ROOT = path.resolve(__dirname, '..', 'tmp', 'pipeline');

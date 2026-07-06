@@ -1,5 +1,175 @@
 # 播客平台 CHANGELOG
 
+## [0.6.0] - 2026-07-06
+
+### 修改时间
+- 2026-07-06（上海时间）
+
+### 新增：扫码/拍摄封面识别图书 → 主播口播页
+
+直播时拍摄外文图书封面，自动识别并跳转到现有图书详情+口播稿页面，方便主播根据口播稿直播带货。
+
+#### 后端
+- `backend/src/config/configuration.ts`：新增 `thirdParty.llmVision` 配置节（endpoint/apiKey/model）。
+- `backend/src/modules/book/cover-recognize.service.ts`（新增）：调 agnes-2.0-flash（OpenAI 兼容）识别封面，图片以 base64 data URL 直传，不落盘。无 API Key 或调用失败返回 null。
+- `backend/src/modules/book/adapters/google-books.adapter.ts`：新增 `searchByTitle(title, author?)` 方法，按书名+作者搜索候选图书（最多 5 本，仅返回有 ISBN 的条目）。
+- `backend/src/modules/book/dto/cover-recognize.dto.ts`（新增）：`CoverRecognizeResultDto` + `CoverRecognizeCandidate`。
+- `backend/src/modules/book/book.controller.ts`：新增 `POST /books/cover/recognize` 端点，multipart/form-data 接收图片，5MB 限制，仅 JPEG/PNG。
+- `backend/src/modules/book/book.module.ts`：注册 `CoverRecognizeService`。
+- `backend/test/cover-recognize.service.spec.ts`（新增）：5 个测试（无 Key/JSON 解析/代码块包裹/空 title/异常）。
+- `backend/test/google-books.search-by-title.spec.ts`（新增）：6 个测试（空 title/无配置/映射/上限/异常/无结果）。
+
+#### 前端
+- `frontend/src/api/book.api.ts`：新增 `recognizeCover(file)` 方法 + `CoverRecognizeResult`/`CoverRecognizeCandidate` 类型。
+- `frontend/src/pages/ScanCover.tsx`（新增）：扫码页面，原生 `<input capture>` 调起摄像头，候选卡片列表，识别失败提供手动输入兜底。
+- `frontend/src/router/index.tsx`：新增 `/scan` 路由（React.lazy 代码分割）。
+- `frontend/src/components/layout/Sidebar.tsx`：新增"扫码口播"导航项（PhotoCameraIcon）。
+- `frontend/src/i18n/zh-CN.json` + `en-US.json`：新增 `nav.scan` + `scan` 命名空间（13 个 key）。
+- `frontend/src/__tests__/ScanCover.test.tsx`（新增）：5 个测试（渲染/识别成功/无候选/异常/loading）。
+
+#### 文档与配置
+- `.env.example`：新增 `LLM_VISION_ENDPOINT`/`LLM_VISION_API_KEY`/`LLM_VISION_MODEL`。
+- `docs/environment.md`：新增"4.1 封面识别 LLM Vision"小节。
+- `.trae/documents/v0.6.0-change-log-2026-07-06.md`（新增）：详细变更日志。
+- 版本号 0.5.0 → 0.6.0（root + frontend + backend）。
+
+### 验证结果
+
+| 检查项 | 命令 | 结果 |
+|--------|------|------|
+| 后端测试 | `pnpm --filter backend test` | 20 suites passed, 112 tests passed |
+| 后端 lint | `eslint . --ext .ts` | 0 errors, 0 warnings |
+| 后端构建 | `pnpm --filter backend build` | nest build passed |
+| 前端测试 | `pnpm --filter frontend test` | 17 suites passed, 178 tests passed |
+| 前端 lint | `eslint . --ext .ts,.tsx` | 0 errors, 0 warnings |
+| 前端构建 | `pnpm --filter frontend build` | tsc -b && vite build passed |
+
+### 设计决策
+- **LLM 分工**：agnes-2.0-flash 识别封面（免费+vision），MiMo-V2.5-Pro 生成口播稿（保持不动，互不影响）。
+- **图片不落盘**：base64 data URL 直传 agnes，识别后丢弃，零存储成本、零隐私泄露。
+- **零前端依赖**：原生 `<input type="file" capture="environment">` 调起摄像头，移动端拍照、桌面端选文件。
+- **候选列表最多 5 本**：避免选择困难。
+- **手动输入兜底**：识别失败或无候选时，输入书名跳转选书库搜索。
+
+## [0.5.0] - 2026-07-05
+
+### 修改时间
+- 2026-07-05（上海时间）
+
+### 质量运维审计整改闭环（S2/S3 验收）
+
+围绕 9 个维度完成整改并跑通全量测试与构建：代码质量、测试覆盖、安全审查、性能优化、配置与环境、数据库与迁移、部署与回滚、监控与告警、文档与交接。
+
+#### 安全
+- `backend/src/main.ts`：生产环境强制校验 `JWT_SECRET`、`DATABASE_URL`、`CORS_ORIGINS`，使用默认值即报错，防止生产用默认配置启动。
+- `backend/src/modules/auth/auth.service.ts`：实现 refresh token 吊销与轮换（token rotation），登录/刷新写入数据库，logout/刷新后吊销旧 token。
+- `backend/prisma/schema.prisma`：新增 `RefreshToken` 模型。
+- `backend/src/app.module.ts`：pino 日志增加 `redact`，脱敏 `authorization`、`cookie`、`password`、`refreshToken`。
+- `backend/src/modules/auth/auth.controller.ts`：新增 `POST /auth/logout` 端点，用于吊销 refresh token。
+- `backend/src/config/configuration.ts`：新增 `jwt.refreshSecret` 配置。
+
+#### 监控与告警
+- `backend/src/common/interceptors/metrics.interceptor.ts`：新增 HTTP 请求 Prometheus 指标 `http_requests_total`。
+- `backend/src/modules/metrics/*`：新增 Prometheus metrics 模块与 `/api/metrics` 公开端点。
+- `backend/src/modules/queue/queue.service.ts`：新增 BullMQ 队列指标 `bullmq_queue_waiting/completed/failed`，并修复热重载时重复注册问题。
+- 新增 `docs/monitoring-alerting.md`：记录指标列表、Prometheus 配置示例与告警规则。
+
+#### 部署与数据
+- `docker-compose.yml`：backend Dockerfile 统一为 `backend/Dockerfile`。
+- 新增 `infra/scripts/backup-db.sh` / `backup-db.ps1`：PostgreSQL 备份脚本。
+- 新增 `docs/rollback-playbook.md`：应用与数据库回滚手册。
+
+#### 代码质量
+- 收敛前端 lint warning：清理 9 个前端文件中的未使用导入/变量与无效 eslint-disable 指令。
+  - `frontend/src/__tests__/download.test.ts`：移除未使用的 `blob` 变量。
+  - `frontend/src/__tests__/api.client.test.ts`：移除未使用的 `axios` 导入、`resp` 变量、`callCount` 变量；将测试中的 `any` 断言改为具体交叉类型或 `never`。
+  - `frontend/src/components/common/ErrorBoundary.tsx`：移除未使用的 `Box` 导入与无效 `eslint-disable-next-line no-console`。
+  - `frontend/src/components/script/SixSegmentView.tsx`：移除未使用的 `InputLabel` 导入与 `emotionEmoji` 变量。
+  - `frontend/src/features/book-select/BookListItem.tsx`：移除未使用的 `CardActions`、`Button` 导入。
+  - `frontend/src/pages/ProjectDetail.tsx`：移除未使用的 `ScriptEditor` 导入。
+  - `frontend/src/pages/Settings.tsx`：移除未使用的 `ListItemSecondaryAction` 导入。
+  - `frontend/src/storage/local-storage.adapter.ts`：移除无效 `eslint-disable-next-line no-console`。
+  - `frontend/src/utils/logger.ts`：移除不必要的 `/* eslint-disable no-console */`。
+- 验证：`..\node_modules\.bin\eslint.cmd . --ext .ts,.tsx` 在 `frontend` 目录下 exit 0，0 errors、0 warnings。
+- 收敛后端 lint warning：清理 13 个后端文件中的未使用导入/变量、无效 eslint-disable、`any` 类型与 `require()` import。
+  - `backend/src/common/filters/http-exception.filter.ts`：移除未使用的 `ErrorPayload` 接口。
+  - `backend/src/common/guards/jwt-auth.guard.ts`：`any` 改为 `Request & { user: unknown }`。
+  - `backend/src/main.ts`、`bgm.seed.ts`、`progress.ts`、`step3-tts-mix.ts`：移除无效 `eslint-disable-next-line no-console`。
+  - `backend/src/modules/book/adapters/bookrank.adapter.ts`：移除未使用的 `BookLibraryItem` 导入。
+  - `backend/src/modules/book/book.controller.ts`：未使用参数 `jobId` 改为 `_jobId`。
+  - `backend/src/modules/pipeline/pipeline.service.ts`：移除未使用的 `emitProgress` 导入。
+  - `backend/src/modules/script/script.controller.ts`：移除未使用的 `UseGuards` 导入，未使用参数 `user` 改为 `_user`。
+  - `backend/src/modules/tts/tts.controller.ts`：移除未使用的 `UseGuards`、`JwtAuthGuard` 导入。
+  - `backend/test/auth.e2e-spec.ts`：`require()` import 改为 ESM `import`。
+  - `backend/test/book-library.service.spec.ts`、`project.service.spec.ts`：`any` 改为 `Record<string, unknown>`。
+  - `backend/test/pipeline.e2e-spec.ts`：未使用变量 `EXPORTS_TMP_DIR` 改为 `_EXPORTS_TMP_DIR`。
+- 验证：`..\node_modules\.bin\eslint.cmd . --ext .ts` 在 `backend` 目录下 exit 0，0 errors、0 warnings。
+
+#### 文档与交接
+- 新增 `docs/code-review-checklist.md`：8 大类 PR 审查清单（基础检查、代码质量、安全、数据库、前端、测试、性能、文档与版本）。
+- 新增 `docs/performance-budget.md`：前端 / 后端 / 第三方依赖 / 基础设施性能预算与优化优先级。
+- 新增 `docs/release-process.md`：版本号规范、发布前检查清单、发布步骤、回滚流程、发布记录。
+- 新增 `docs/environment.md`：环境变量清单，按 8 大类整理 40+ 变量，标注必填/可选/本地默认/生产必改/归属，附生产部署最小清单。
+- 修复 `docs/deployment.md` 健康检查路径不一致：`/health` → `/api/health`（与 `deploy.md` 和后端全局前缀 `/api` 对齐）。
+
+#### 用户体验（长辈模式 + 文案口语化）
+- 新增长辈模式（elderMode）：通过 CSS 变量 `--font-scale` 放大根字号 25%，MUI typography 基于 rem 自动跟随；同时 `data-elder-mode="on"` 时 body 字重加粗至 500，提升对比度。
+  - `frontend/src/store/ui.store.ts`：新增 `elderMode` 状态、`setElderMode` / `toggleElderMode` 方法、`applyElderMode` 副作用，持久化到 localStorage（key: `ui.elderMode`）。
+  - `frontend/src/index.css`：新增 `:root { --font-scale: 1 }` 与 `html { font-size: calc(16px * var(--font-scale, 1)) }`，新增 `html[data-elder-mode="on"] body { font-weight: 500 }`。
+  - `frontend/src/pages/Settings.tsx`：偏好卡片顶部新增受控的长辈模式 Switch，文案走 i18n。
+  - `frontend/src/__tests__/ui.store.test.ts`：新增 4 个 elderMode 测试（应用 `--font-scale`/`data-elder-mode`、重置、持久化、toggle）。
+- 文案口语化：将技术化术语改为日常用语。
+  - `zh-CN.json`：`book.fetching` "正在抓取元数据..." → "正在获取图书信息..."；`book.fetched` "已抓取" → "已获取"；`book.failed` "抓取失败" → "获取失败"；`generating.stage.metadata` "拉取书籍信息" → "获取图书信息"；`generating.stage.tts` "TTS 语音合成" → "语音合成"。
+  - `zh-CN.json` / `en-US.json` 新增 `settings.elderMode`、`settings.elderModeHint`、`settings.darkMode`、`settings.notifyOnComplete`、`settings.autoPlayBgm` 文案。
+  - `Settings.tsx` 偏好区硬编码中文改为 i18n key 引用，支持中英切换。
+- BookDetail 信息分层与无障碍：
+  - 左栏图书信息按"基本信息/简介/入库信息"三段分组，每段加 `aria-label` 与小标题，用 `Divider` 分隔。
+  - 标题 `Typography` 加 `component="h1"` / `component="h2"` 语义化标签。
+  - 封面 `img` alt 从书名改为"书名 封面"，更易理解。
+  - 标签 `Stack` 加 `aria-label="图书标签"`。
+  - 口播稿 `TextField` 加 `aria-label="主播口播稿编辑框"`。
+
+#### 测试修复
+- `backend/test/auth.service.spec.ts`：补齐 `refreshToken` mock，修复 refresh token 改造后的单元测试。
+- `backend/test/pipeline.service.spec.ts`：延长超时至 30 秒，避免本地跑 pipeline 超时。
+- `backend/test/queue.service.spec.ts`：修复 BullMQ 指标重复注册导致的测试错误。
+- `frontend/vitest.config.ts` + `frontend/vitest.setup.ts`：修复 pnpm workspace + Vitest SSR 下 React 多实例问题，解决 `Cannot read properties of null (reading 'useState')` 等 hook 错误。
+
+#### 验证
+- 前端测试：`pnpm --filter frontend test` → 16 个测试文件通过，169 个测试通过。
+- 后端测试：`pnpm --filter backend test` → 18 个测试套件通过，3 个跳过；101 个测试通过，14 个跳过。
+- 后端构建：`pnpm --filter backend build` → Nest build passed。
+- 前端构建：`pnpm --filter frontend build` → `tsc -b && vite build` passed。
+
+#### 版本号
+- root / frontend / backend 统一升级到 `0.5.0`。
+
+---
+
+## [0.4.1] - 2026-07-05
+
+### 修改时间
+- 2026-07-05（上海时间）
+
+### S1 部署与数据平台整改（质量运维审计 3.6 / 3.7）
+
+统一 Docker 构建入口，补齐数据库备份脚本与回滚手册。
+
+#### 新增
+- `infra/scripts/backup-db.sh`：Linux / Docker 环境 PostgreSQL 备份脚本，从 `DATABASE_URL` 读取连接串，生成 `backups/podcast_backup_YYYYMMDD_HHMMSS.sql`。
+- `infra/scripts/backup-db.ps1`：Windows PowerShell 版 PostgreSQL 备份脚本，输出路径与命名规则与 `.sh` 一致。
+- `docs/rollback-playbook.md`：应用回滚（Render / Vercel / Docker Compose）、数据库回滚（`pg_dump` → `prisma migrate resolve` → `pg_restore`）、紧急检查清单与联系人模板。
+
+#### 变更
+- `docker-compose.yml`：backend 服务的 `dockerfile` 从 `infra/docker/backend.Dockerfile` 改为 `backend/Dockerfile`，与 Render 生产构建保持一致。
+- `infra/docker/backend.Dockerfile`：替换为说明文件，指向权威版本 `backend/Dockerfile`，避免双 Dockerfile 造成混淆。
+
+#### 验证
+- `docker compose -f podcast-platform/docker-compose.yml config` ✅（backend 指向 `backend/Dockerfile`）
+- YAML 格式检查 ✅
+
+---
+
 ## [0.4.0] - 2026-07-01
 
 ### 修改时间

@@ -63,7 +63,7 @@ const PIPELINE_TMP_DIR = path.resolve(__dirname, '..', 'tmp', 'pipeline');
 // `process.cwd()` is `.../podcast-platform/backend` when running
 // `cd backend && pnpm test:e2e`, so the path is `tmp/exports`,
 // not `backend/tmp/exports`.
-const EXPORTS_TMP_DIR = path.resolve(process.cwd(), 'tmp', 'exports');
+const _EXPORTS_TMP_DIR = path.resolve(process.cwd(), 'tmp', 'exports');
 
 /**
  * Skip conditions:

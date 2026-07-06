@@ -10,7 +10,6 @@ import {
   MenuItem,
   Select,
   FormControl,
-  InputLabel,
   Button,
   Tooltip,
   type SelectChangeEvent,
@@ -48,7 +47,6 @@ const NEW_ID = (): string =>
   `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const emotionColor = (e: ScriptEmotion): string => EMOTIONS.find((x) => x.key === e)?.color ?? '#94a3b8';
-const emotionEmoji = (e: ScriptEmotion): string => EMOTIONS.find((x) => x.key === e)?.emoji ?? '🎙';
 /**
  * Returns a safe emotion key for MUI Select. If the AI prompt ever produces
  * an emotion string that is not in the `EMOTIONS` whitelist (e.g. `'兴奋'`),

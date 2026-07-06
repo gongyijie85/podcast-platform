@@ -13,7 +13,6 @@ export const localStorageAdapter = {
     try {
       localStorage.setItem(NS + key, JSON.stringify(value));
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn('localStorage.set failed', e);
     }
   },

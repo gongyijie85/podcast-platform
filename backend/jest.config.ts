@@ -46,6 +46,23 @@ const config: Config = {
   },
   transformIgnorePatterns: ['/node_modules/', '\\.pnp\\.[^\\/]+$'],
   clearMocks: true,
+  // 覆盖率收集：仅在带 --coverage 时生效，默认测试不开启，避免拖慢日常执行。
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/main.ts',
+    '!src/**/*.module.ts',
+    '!src/**/*.d.ts',
+    '!src/**/__mocks__/**',
+  ],
+  coverageDirectory: './coverage',
+  coverageThreshold: {
+    global: {
+      branches: 60,
+      functions: 60,
+      lines: 60,
+      statements: 60,
+    },
+  },
 };
 
 export default config;

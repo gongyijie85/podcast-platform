@@ -4,11 +4,34 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './app.module';
+import { configuration } from './config/configuration';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import * as path from 'node:path';
 
 async function bootstrap() {
+  // 生产环境启动前强制校验关键配置，避免使用默认值上线
+  if (process.env.NODE_ENV === 'production') {
+    const config = configuration();
+    const unsafeJwtSecrets = ['', 'change-me', 'please-change-me-in-production'];
+    const unsafeDatabaseUrls = [
+      '',
+      'postgresql://postgres:postgres@localhost:5432/podcast',
+      'postgresql://postgres:postgres@postgres:5432/podcast',
+    ];
+    const unsafeCorsOrigins = ['', 'http://localhost:5173'];
+
+    if (unsafeJwtSecrets.includes(config.jwt.secret)) {
+      throw new Error('JWT_SECRET must be set to a secure value in production');
+    }
+    if (unsafeDatabaseUrls.includes(config.database.url)) {
+      throw new Error('DATABASE_URL must be set to a production value');
+    }
+    if (config.corsOrigins.length === 0 || config.corsOrigins.every((o) => unsafeCorsOrigins.includes(o))) {
+      throw new Error('CORS_ORIGINS must be set to production origins');
+    }
+  }
+
   // `NestExpressApplication` gives us access to express-specific
   // helpers like `useStaticAssets` (used by the v1.1 dev-only exports
   // directory). The cast is safe because the bootstrap explicitly
@@ -72,7 +95,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error('Fatal startup error', err);
   process.exit(1);
 });

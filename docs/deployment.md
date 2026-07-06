@@ -28,5 +28,5 @@ docker compose up -d
 
 ## 健康检查
 
-- Backend: `GET /health` → `{"status":"ok"}`
+- Backend: `GET /api/health` → `{"code":0,"data":{"status":"ok"}}`（全局前缀 `/api`）
 - 容器: Docker healthcheck 已配置 PG / Redis / MinIO

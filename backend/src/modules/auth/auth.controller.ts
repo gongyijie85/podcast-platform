@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { LogoutDto } from './dto/logout.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { Public } from './public.decorator';
@@ -41,8 +42,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(204)
   @Post('logout')
-  async logout(): Promise<null> {
-    // With JWT (stateless), client just discards tokens.
+  async logout(@Body() dto: LogoutDto): Promise<null> {
+    await this.auth.logout(dto.refreshToken);
     return null;
   }
 }

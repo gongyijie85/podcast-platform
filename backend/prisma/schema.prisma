@@ -20,9 +20,10 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  projects     Project[]
-  preferences  UserPreference[]
-  errorLogs    ErrorLog[]
+  projects       Project[]
+  preferences    UserPreference[]
+  errorLogs      ErrorLog[]
+  refreshTokens  RefreshToken[]
 
   @@map("users")
 }
@@ -272,4 +273,19 @@ model ErrorLog {
   @@index([userId])
   @@index([stage])
   @@map("error_logs")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  jti        String    @unique
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }

@@ -7,6 +7,8 @@ describe('useUiStore', () => {
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.removeAttribute('lang');
+    document.documentElement.removeAttribute('data-elder-mode');
+    document.documentElement.style.removeProperty('--font-scale');
     // Reset store to initial state
     useUiStore.setState({
       snackbars: [],
@@ -14,6 +16,7 @@ describe('useUiStore', () => {
       sidebarCollapsed: false,
       theme: 'light',
       language: 'zh-CN',
+      elderMode: false,
     });
   });
   afterEach(() => {
@@ -95,6 +98,37 @@ describe('useUiStore', () => {
     it('setLanguage to zh-CN sets lang=zh-CN', () => {
       useUiStore.getState().setLanguage('zh-CN');
       expect(document.documentElement.getAttribute('lang')).toBe('zh-CN');
+    });
+  });
+
+  describe('elderMode', () => {
+    it('setElderMode updates state and applies --font-scale + data-elder-mode', () => {
+      useUiStore.getState().setElderMode(true);
+      expect(useUiStore.getState().elderMode).toBe(true);
+      expect(document.documentElement.style.getPropertyValue('--font-scale')).toBe('1.25');
+      expect(document.documentElement.getAttribute('data-elder-mode')).toBe('on');
+    });
+
+    it('setElderMode(false) resets --font-scale to 1', () => {
+      useUiStore.getState().setElderMode(true);
+      useUiStore.getState().setElderMode(false);
+      expect(useUiStore.getState().elderMode).toBe(false);
+      expect(document.documentElement.style.getPropertyValue('--font-scale')).toBe('1');
+      expect(document.documentElement.getAttribute('data-elder-mode')).toBe('off');
+    });
+
+    it('setElderMode persists to localStorage', () => {
+      useUiStore.getState().setElderMode(true);
+      expect(localStorageAdapter.get<boolean>('ui.elderMode')).toBe(true);
+    });
+
+    it('toggleElderMode flips state and persists', () => {
+      useUiStore.setState({ elderMode: false });
+      useUiStore.getState().toggleElderMode();
+      expect(useUiStore.getState().elderMode).toBe(true);
+      expect(localStorageAdapter.get<boolean>('ui.elderMode')).toBe(true);
+      useUiStore.getState().toggleElderMode();
+      expect(useUiStore.getState().elderMode).toBe(false);
     });
   });
 

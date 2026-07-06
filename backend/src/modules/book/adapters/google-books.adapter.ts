@@ -98,6 +98,58 @@ export class GoogleBooksAdapter implements BookApiAdapter {
     }
   }
 
+  /**
+   * 按书名+作者搜索候选图书（用于封面识别后的候选列表）。
+   * 不走缓存（搜索结果变化大），最多返回 5 本，仅返回有 ISBN 的条目。
+   * 出错或无结果返回空数组。
+   */
+  async searchByTitle(title: string, author?: string): Promise<BookMetadata[]> {
+    const cleanedTitle = this.clean(title);
+    if (!cleanedTitle) return [];
+
+    const base = this.config.get<string>('thirdParty.googleBooks.base');
+    const apiKey = this.config.get<string>('thirdParty.googleBooks.apiKey');
+    if (!base) return [];
+
+    let query = `intitle:${encodeURIComponent(cleanedTitle)}`;
+    const cleanedAuthor = this.clean(author);
+    if (cleanedAuthor) {
+      query += `+inauthor:${encodeURIComponent(cleanedAuthor)}`;
+    }
+
+    try {
+      const items = await this.searchVolumes(base, apiKey, query);
+      const deduped = this.dedupeVolumes(items);
+      const result: BookMetadata[] = [];
+      for (const volume of deduped) {
+        if (!volume.volumeInfo?.title) continue;
+        const isbn = this.pickIsbnFromVolume(volume);
+        if (!isbn) continue;
+        const metadata = this.toMetadata(isbn, volume);
+        if (metadata) result.push(metadata);
+        if (result.length >= 5) break;
+      }
+      return result;
+    } catch (e) {
+      this.logger.warn(`GoogleBooks searchByTitle failed: ${(e as Error).message}`);
+      return [];
+    }
+  }
+
+  /**
+   * 从 volume 的 industryIdentifiers 中提取 ISBN-13（优先）或 ISBN-10
+   */
+  private pickIsbnFromVolume(volume: GoogleVolume): string | null {
+    const ids = volume.volumeInfo?.industryIdentifiers ?? [];
+    if (ids.length === 0) return null;
+    const isbn13 = ids.find((id) => id.type === 'ISBN_13' && id.identifier);
+    if (isbn13?.identifier) return this.cleanIdentifier(isbn13.identifier);
+    const isbn10 = ids.find((id) => id.type === 'ISBN_10' && id.identifier);
+    if (isbn10?.identifier) return this.cleanIdentifier(isbn10.identifier);
+    const anyId = ids.find((id) => id.identifier && /^\d{9,13}[\dXx]$/.test(id.identifier));
+    return anyId?.identifier ? this.cleanIdentifier(anyId.identifier) : null;
+  }
+
   private async searchExactCandidates(base: string, isbn: string, apiKey: string | undefined): Promise<GoogleVolume[]> {
     const collected: GoogleVolume[] = [];
     for (const query of this.buildSearchQueries(isbn)) {

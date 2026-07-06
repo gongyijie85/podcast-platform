@@ -4,7 +4,7 @@ import type { BookMetadata } from '@shared/book';
 const now = new Date('2026-06-18T00:00:00.000Z');
 
 describe('BookLibraryService', () => {
-  const rows = new Map<string, any>();
+  const rows = new Map<string, Record<string, unknown>>();
   const prisma = {
     bookLibraryItem: {
       findUnique: jest.fn(),
@@ -24,7 +24,7 @@ describe('BookLibraryService', () => {
     jest.clearAllMocks();
     rows.clear();
     prisma.bookLibraryItem.findUnique.mockImplementation(({ where }: { where: { isbn: string } }) => rows.get(where.isbn) ?? null);
-    prisma.bookLibraryItem.create.mockImplementation(({ data }: { data: any }) => {
+    prisma.bookLibraryItem.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => {
       const row = {
         id: `lib-${data.isbn}`,
         firstSeenAt: now,
@@ -35,7 +35,7 @@ describe('BookLibraryService', () => {
       rows.set(data.isbn, row);
       return row;
     });
-    prisma.bookLibraryItem.update.mockImplementation(({ where, data }: { where: { isbn: string }; data: any }) => {
+    prisma.bookLibraryItem.update.mockImplementation(({ where, data }: { where: { isbn: string }; data: Record<string, unknown> }) => {
       const existing = rows.get(where.isbn);
       const row = {
         ...existing,

@@ -23,6 +23,12 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ApiSuccess<T>>
       randomUUID();
     res.setHeader('X-Trace-Id', traceId);
 
+    // Prometheus 指标端点需要返回原始 text/plain，跳过统一响应包装
+    const requestPath = (req.baseUrl || '') + (req.path || '');
+    if (requestPath === '/api/metrics') {
+      return next.handle();
+    }
+
     return next.handle().pipe(
       map((data: T) => ({
         code: 0,

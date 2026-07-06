@@ -52,7 +52,6 @@ export function emitProgress(
     // We intentionally swallow user-callback errors. The pipeline must not
     // fail because a downstream consumer threw; that would be a regression
     // vs. v1.0 where `ProgressGateway` was a fire-and-forget sink.
-    // eslint-disable-next-line no-console
     console.warn(
       `[pipeline/progress] callback threw for runId=${runId} step=${step}: ${
         e instanceof Error ? e.message : String(e)

@@ -7,6 +7,7 @@
     "home": "Home",
     "dashboard": "Dashboard",
     "book": "Book organizer",
+    "scan": "Scan cover",
     "config": "② Config",
     "generating": "③ Generate",
     "preview": "④ Preview & Export",
@@ -147,6 +148,20 @@
     "notFound": "Book not found",
     "back": "← Back to library"
   },
+  "scan": {
+    "title": "Scan cover to identify book",
+    "subtitle": "Snap a cover during live stream, auto-load pitch script",
+    "button": "Take photo / Upload cover",
+    "recognizing": "Recognizing cover...",
+    "candidates": "Found {{count}} candidate books, please pick one",
+    "noResults": "No matching books found",
+    "recognizeFailed": "Recognition failed, please retry or enter title manually",
+    "manualInput": "Enter title manually",
+    "manualInputPlaceholder": "Type title and press Enter",
+    "manualSearchFailed": "Manual search failed, please retry later",
+    "tip": "Recognition accuracy depends on cover clarity, shoot from front",
+    "selectCandidate": "Select this book"
+  },
   "projectCreate": {
     "title": "Create project",
     "steps": {
@@ -185,6 +200,11 @@
     "language": "Language",
     "languageZh": "中文",
     "languageEn": "English",
+    "elderMode": "Elder mode (larger font, bolder text)",
+    "elderModeHint": "For elderly or visually impaired users",
+    "darkMode": "Enable dark mode",
+    "notifyOnComplete": "Notify when generation completes",
+    "autoPlayBgm": "Auto-play next BGM",
     "logout": "Log out",
     "logoutConfirm": "Are you sure you want to log out?"
   },

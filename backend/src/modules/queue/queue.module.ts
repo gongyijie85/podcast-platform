@@ -1,6 +1,7 @@
-import { Global, Module, OnApplicationShutdown, forwardRef } from '@nestjs/common';
+import { Global, Module, OnApplicationShutdown, OnModuleInit, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { BullModule } from '@nestjs/bullmq';
+import { BullModule, InjectQueue } from '@nestjs/bullmq';
+import { Queue, QueueEvents } from 'bullmq';
 import { MetadataProcessor } from './processors/metadata.processor';
 import { ScriptProcessor } from './processors/script.processor';
 import { TtsProcessor } from './processors/tts.processor';
@@ -59,10 +60,63 @@ import { QUEUE_NAMES } from './constants';
   providers: [QueueService, MetadataProcessor, ScriptProcessor, TtsProcessor, SubtitleProcessor, MixProcessor],
   exports: [QueueService, BullModule],
 })
-export class QueueModule implements OnApplicationShutdown {
+export class QueueModule implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(QueueModule.name);
+  private queueEvents: QueueEvents[] = [];
+
+  constructor(
+    private readonly config: ConfigService,
+    private readonly queueService: QueueService,
+    @InjectQueue(QUEUE_NAMES.METADATA) private readonly metadataQ: Queue,
+    @InjectQueue(QUEUE_NAMES.SCRIPT) private readonly scriptQ: Queue,
+    @InjectQueue(QUEUE_NAMES.TTS) private readonly ttsQ: Queue,
+    @InjectQueue(QUEUE_NAMES.SUBTITLE) private readonly subtitleQ: Queue,
+    @InjectQueue(QUEUE_NAMES.MIX) private readonly mixQ: Queue,
+  ) {}
+
+  onModuleInit(): void {
+    if (!this.queueService.isRedisMode()) {
+      return;
+    }
+
+    const queues = [
+      this.metadataQ,
+      this.scriptQ,
+      this.ttsQ,
+      this.subtitleQ,
+      this.mixQ,
+    ];
+
+    for (const queue of queues) {
+      const events = new QueueEvents(queue.name, {
+        connection: {
+          host: this.config.get<string>('redis.host'),
+          port: this.config.get<number>('redis.port'),
+          username: this.config.get<string>('redis.username') || undefined,
+          password: this.config.get<string>('redis.password') || undefined,
+          tls: this.config.get<boolean>('redis.tls') ? {} : undefined,
+        },
+      });
+
+      events.on('waiting', ({ jobId }) => {
+        this.logger.debug(`[metrics] waiting ${queue.name} job=${jobId}`);
+        this.queueService.incWaiting(queue.name);
+      });
+      events.on('completed', ({ jobId }) => {
+        this.logger.debug(`[metrics] completed ${queue.name} job=${jobId}`);
+        this.queueService.incCompleted(queue.name);
+      });
+      events.on('failed', ({ jobId }) => {
+        this.logger.debug(`[metrics] failed ${queue.name} job=${jobId}`);
+        this.queueService.incFailed(queue.name);
+      });
+
+      this.queueEvents.push(events);
+    }
+  }
 
   async onApplicationShutdown(): Promise<void> {
     this.logger.log('QueueModule shutting down');
+    await Promise.all(this.queueEvents.map((e) => e.close()));
   }
 }

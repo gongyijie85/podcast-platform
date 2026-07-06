@@ -15,6 +15,28 @@ import type {
   BgmCategory,
 } from '@shared/book';
 
+/**
+ * 封面识别候选项（与后端 CoverRecognizeCandidate 对齐）
+ */
+export interface CoverRecognizeCandidate {
+  isbn: string;
+  title: string;
+  author: string;
+  coverUrl?: string | null;
+  summary?: string | null;
+  publisher?: string | null;
+  publishedDate?: string | null;
+  pageCount?: number | null;
+}
+
+/**
+ * 封面识别结果
+ */
+export interface CoverRecognizeResult {
+  candidates: CoverRecognizeCandidate[];
+  rawRecognition: { title: string; author?: string } | null;
+}
+
 export const bookApi = {
   async fetchMetadata(isbns: string[], projectId: string): Promise<FetchMetadataResult> {
     return request<FetchMetadataResult>({ method: 'POST', url: '/books/metadata', data: { isbns, projectId } });
@@ -58,6 +80,21 @@ export const bookApi = {
   },
   async listBgmCategories(): Promise<BgmCategory[]> {
     return request<BgmCategory[]>({ method: 'GET', url: '/bgm/categories' });
+  },
+  /**
+   * 上传封面图片，后端调 agnes-2.0-flash 识别 + Google Books 搜索候选
+   * @param file 图片文件（JPEG/PNG，<=5MB）
+   */
+  async recognizeCover(file: File): Promise<CoverRecognizeResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request<CoverRecognizeResult>({
+      method: 'POST',
+      url: '/books/cover/recognize',
+      data: formData,
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 30000,
+    });
   },
 };
 

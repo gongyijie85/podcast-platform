@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
 import { ScriptService } from './script.service';
 import { SaveScriptDto } from './dto/script.dto';
 import { Public } from '../auth/public.decorator';
@@ -57,7 +57,7 @@ export class ScriptController {
   @Post('projects/:id/regenerate')
   async regenerate(
     @Param('id') id: string,
-    @CurrentUser() user: AuthUser | null,
+    @CurrentUser() _user: AuthUser | null,
   ): Promise<{ accepted: true }> {
     // Re-run the pipeline from TTS (script already saved).
     await this.queues.enqueueTts(id);
@@ -70,7 +70,7 @@ export class ScriptController {
   @Post('projects/:id/cancel')
   async cancel(
     @Param('id') id: string,
-    @CurrentUser() user: AuthUser | null,
+    @CurrentUser() _user: AuthUser | null,
   ): Promise<{ cancelled: number }> {
     const removed = await this.queues.cancelProjectJobs(id);
     return { cancelled: removed };

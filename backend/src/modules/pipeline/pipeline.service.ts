@@ -59,7 +59,7 @@ import {
   TTS_ADAPTER,
   STORAGE_ADAPTER,
 } from './pipeline.tokens';
-import { emitProgress, makeMonotonicProgressCallback } from './progress';
+import { makeMonotonicProgressCallback } from './progress';
 
 import { runStep1, type Step1Output } from './steps/step1-metadata';
 import { runStep2, type Step2Output } from './steps/step2-script';

@@ -1,9 +1,26 @@
-import { Body, Controller, Get, Inject, Param, Patch, Post, Query, forwardRef } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+  forwardRef,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { BookService } from './book.service';
 import { BookRankImportDto, FetchMetadataDto, ResolveMetadataDto } from './dto/fetch-metadata.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
+import { CoverRecognizeResultDto } from './dto/cover-recognize.dto';
 import { BookLibraryService } from './book-library.service';
 import { BookLibrarySyncService } from './book-library-sync.service';
+import { CoverRecognizeService } from './cover-recognize.service';
+import { GoogleBooksAdapter } from './adapters/google-books.adapter';
 import { LivePitchService } from './live-pitch.service';
 import { Public } from '../auth/public.decorator';
 import { QueueService } from '../queue/queue.service';
@@ -17,6 +34,9 @@ import type {
   ResolveMetadataResult,
 } from '@shared/book';
 
+const COVER_UPLOAD_LIMIT = 5 * 1024 * 1024; // 5MB
+const COVER_ALLOWED_MIMETYPES = ['image/jpeg', 'image/png'];
+
 @Controller()
 export class BookController {
   constructor(
@@ -24,6 +44,8 @@ export class BookController {
     private readonly library: BookLibraryService,
     private readonly librarySync: BookLibrarySyncService,
     private readonly livePitch: LivePitchService,
+    private readonly coverRecognize: CoverRecognizeService,
+    private readonly googleBooks: GoogleBooksAdapter,
     @Inject(forwardRef(() => QueueService))
     private readonly queues: QueueService,
   ) {}
@@ -42,6 +64,49 @@ export class BookController {
     return {
       items: result.ok,
       failed: result.failed.map((isbn) => ({ isbn, reason: 'metadata_not_found' })),
+    };
+  }
+
+  /**
+   * 拍照/上传封面 → agnes-2.0-flash 识别书名+作者 → Google Books 搜索候选
+   * 返回候选图书列表（最多 5 本）+ 原始识别结果（用于调试/兜底提示）
+   */
+  @Public()
+  @Post('books/cover/recognize')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: COVER_UPLOAD_LIMIT },
+      fileFilter: (_req, file, cb) => {
+        if (!COVER_ALLOWED_MIMETYPES.includes(file.mimetype)) {
+          return cb(new BadRequestException('仅支持 JPEG/PNG 图片'), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async recognizeCover(@UploadedFile() file: Express.Multer.File): Promise<CoverRecognizeResultDto> {
+    if (!file) {
+      throw new BadRequestException('请上传封面图片');
+    }
+
+    const recognition = await this.coverRecognize.recognize(file.buffer, file.mimetype);
+    if (!recognition || !recognition.title) {
+      return { candidates: [], rawRecognition: null };
+    }
+
+    const candidates = await this.googleBooks.searchByTitle(recognition.title, recognition.author);
+    return {
+      candidates: candidates.map((c) => ({
+        isbn: c.isbn,
+        title: c.title,
+        author: c.author,
+        coverUrl: c.coverUrl ?? null,
+        summary: c.summary ?? null,
+        publisher: c.publisher ?? null,
+        publishedDate: c.publishedDate ?? null,
+        pageCount: c.pageCount ?? null,
+      })),
+      rawRecognition: { title: recognition.title, author: recognition.author },
     };
   }
 
@@ -106,7 +171,7 @@ export class BookController {
 
   @Public()
   @Get('books/metadata/:jobId')
-  async getJobResult(@Param('jobId') jobId: string): Promise<{ status: string }> {
+  async getJobResult(@Param('jobId') _jobId: string): Promise<{ status: string }> {
     return { status: 'queued' };
   }
 

@@ -29,7 +29,7 @@ describe('triggerDownload', () => {
     revokedUrls = [];
     originalCreateObjectURL = URL.createObjectURL;
     originalRevokeObjectURL = URL.revokeObjectURL;
-    URL.createObjectURL = vi.fn((blob: Blob | MediaSource) => {
+    URL.createObjectURL = vi.fn((_blob: Blob | MediaSource) => {
       const url = `blob:test/${createdUrls.length}`;
       createdUrls.push(url);
       return url;
@@ -47,9 +47,8 @@ describe('triggerDownload', () => {
   });
 
   it('triggers a click on a temporary anchor for a Blob', () => {
-    const blob = new Blob(['hello'], { type: 'text/plain' });
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click');
-    triggerDownload(blob, 'greeting.txt');
+    triggerDownload(new Blob(['hello'], { type: 'text/plain' }), 'greeting.txt');
     expect(clickSpy).toHaveBeenCalledTimes(1);
     // URL should be revoked after the timeout
     return new Promise<void>((resolve) => {

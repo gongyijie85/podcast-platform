@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 type Level = 'debug' | 'info' | 'warn' | 'error';
 
 const levelOrder: Record<Level, number> = { debug: 10, info: 20, warn: 30, error: 40 };

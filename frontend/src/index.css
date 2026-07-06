@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --font-scale: 1;
+}
+
+html {
+  /* 长辈模式通过 --font-scale 放大根字号，MUI typography 基于 rem 会自动跟随 */
+  font-size: calc(16px * var(--font-scale, 1));
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;
@@ -16,6 +25,11 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+/* 长辈模式：增强对比度，加粗文字 */
+html[data-elder-mode="on"] body {
+  font-weight: 500;
 }
 
 .wave-container ::part(cursor) {

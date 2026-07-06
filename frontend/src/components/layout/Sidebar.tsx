@@ -24,6 +24,7 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import SettingsIcon from '@mui/icons-material/Settings';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import { useUiStore } from '../../store/ui.store';
 import { useAuthStore } from '../../store/auth.store';
 
@@ -40,6 +41,7 @@ const ITEMS: NavItem[] = [
   { key: 'projects', labelKey: 'nav.projects', path: '/projects', icon: <LibraryBooksIcon />, requireAuth: true },
   { key: 'new', labelKey: 'dashboard.newProject', path: '/projects/new', icon: <AddCircleOutlineIcon />, requireAuth: true },
   { key: 'book', labelKey: 'nav.book', path: '/books', icon: <SearchIcon /> },
+  { key: 'scan', labelKey: 'nav.scan', path: '/scan', icon: <PhotoCameraIcon /> },
   { key: 'settings', labelKey: 'nav.settings', path: '/settings', icon: <SettingsIcon />, requireAuth: true },
 ];
 

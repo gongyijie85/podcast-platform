@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { Box, Typography, Button, Container, Paper, Stack } from '@mui/material';
+import { Typography, Button, Container, Paper, Stack } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 interface Props {
@@ -24,7 +24,6 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    // eslint-disable-next-line no-console
     console.error('[ErrorBoundary]', error, info);
   }
 

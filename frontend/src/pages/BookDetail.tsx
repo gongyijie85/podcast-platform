@@ -7,6 +7,7 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Divider,
   Grid,
   Stack,
   TextField,
@@ -138,15 +139,17 @@ export function BookDetail(): JSX.Element {
                   <Box
                     component="img"
                     src={book.coverUrl}
-                    alt={book.title}
+                    alt={`${book.title} 封面`}
                     sx={{ maxWidth: 200, alignSelf: 'flex-start', borderRadius: 1 }}
                   />
                 )}
-                <Typography variant="h5">{book.title}</Typography>
-                <Typography variant="body1" color="text.secondary">
-                  {book.author}
-                </Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Box>
+                  <Typography variant="h5" component="h1">{book.title}</Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    {book.author}
+                  </Typography>
+                </Box>
+                <Stack direction="row" spacing={1} flexWrap="wrap" aria-label="图书标签">
                   {book.source && (
                     <Chip size="small" label={SOURCE_LABELS[book.source] ?? book.source} />
                   )}
@@ -158,32 +161,53 @@ export function BookDetail(): JSX.Element {
                     />
                   )}
                 </Stack>
-                <Typography variant="body2">
-                  ISBN：{book.isbn}
-                </Typography>
-                {book.publisher && (
-                  <Typography variant="body2">出版社：{book.publisher}</Typography>
-                )}
-                {book.publishedDate && (
-                  <Typography variant="body2">出版日期：{book.publishedDate}</Typography>
-                )}
-                {book.pageCount && (
-                  <Typography variant="body2">页数：{book.pageCount}</Typography>
-                )}
+
+                <Divider sx={{ my: 0.5 }} />
+                <Box component="section" aria-label="基本信息">
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    基本信息
+                  </Typography>
+                  <Typography variant="body2">
+                    ISBN：{book.isbn}
+                  </Typography>
+                  {book.publisher && (
+                    <Typography variant="body2">出版社：{book.publisher}</Typography>
+                  )}
+                  {book.publishedDate && (
+                    <Typography variant="body2">出版日期：{book.publishedDate}</Typography>
+                  )}
+                  {book.pageCount && (
+                    <Typography variant="body2">页数：{book.pageCount}</Typography>
+                  )}
+                </Box>
+
                 {book.summary && (
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    简介：{book.summary}
-                  </Typography>
+                  <Box component="section" aria-label="图书简介">
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                      简介
+                    </Typography>
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {book.summary}
+                    </Typography>
+                  </Box>
                 )}
-                {book.firstSeenAt && (
-                  <Typography variant="caption" color="text.secondary">
-                    首次入库：{formatTime(book.firstSeenAt)}
-                  </Typography>
-                )}
-                {book.lastSeenAt && (
-                  <Typography variant="caption" color="text.secondary">
-                    最后同步：{formatTime(book.lastSeenAt)}
-                  </Typography>
+
+                {(book.firstSeenAt || book.lastSeenAt) && (
+                  <Box component="section" aria-label="入库信息">
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                      入库信息
+                    </Typography>
+                    {book.firstSeenAt && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        首次入库：{formatTime(book.firstSeenAt)}
+                      </Typography>
+                    )}
+                    {book.lastSeenAt && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        最后同步：{formatTime(book.lastSeenAt)}
+                      </Typography>
+                    )}
+                  </Box>
                 )}
               </Stack>
             </CardContent>
@@ -195,7 +219,7 @@ export function BookDetail(): JSX.Element {
             <CardContent>
               <Stack spacing={2}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="h6">{t('bookDetail.title')}</Typography>
+                  <Typography variant="h6" component="h2">{t('bookDetail.title')}</Typography>
                   {book.livePitchGeneratedAt && (
                     <Typography variant="caption" color="text.secondary">
                       {t('bookDetail.generatedAt', { time: formatTime(book.livePitchGeneratedAt) })}
@@ -211,6 +235,7 @@ export function BookDetail(): JSX.Element {
                   onChange={(e) => setLivePitch(e.target.value)}
                   placeholder="在此编辑主播口播稿，或点击 AI 生成"
                   disabled={generating || saving}
+                  aria-label="主播口播稿编辑框"
                 />
                 <Stack direction="row" spacing={1}>
                   <Button

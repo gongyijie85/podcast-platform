@@ -10,11 +10,6 @@ import { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { ErrorCode } from '@shared/api';
 
-interface ErrorPayload {
-  code: number;
-  message: string;
-}
-
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);

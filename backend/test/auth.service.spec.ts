@@ -18,9 +18,17 @@ type MockPrisma = {
   };
 };
 
-type MockJwt = {
-  signAsync: jest.Mock;
-  verifyAsync: jest.Mock;
+type MockPrisma = {
+  user: {
+    findUnique: jest.Mock;
+    create: jest.Mock;
+  };
+  refreshToken: {
+    findUnique: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    updateMany: jest.Mock;
+  };
 };
 
 function makePrisma(): MockPrisma {
@@ -28,6 +36,12 @@ function makePrisma(): MockPrisma {
     user: {
       findUnique: jest.fn(),
       create: jest.fn(),
+    },
+    refreshToken: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
     },
   };
 }
@@ -44,6 +58,7 @@ function makeConfig(): { get: jest.Mock } {
     get: jest.fn((key: string) => {
       const map: Record<string, string> = {
         'jwt.secret': 'test-secret',
+        'jwt.refreshSecret': 'test-refresh-secret',
         'jwt.accessExpires': '15m',
         'jwt.refreshExpires': '7d',
       };
@@ -81,6 +96,7 @@ describe('AuthService', () => {
       const { svc, prisma, jwt } = makeService();
       prisma.user.findUnique.mockResolvedValue(null);
       prisma.user.create.mockResolvedValue(fixedUser);
+      prisma.refreshToken.create.mockResolvedValue({ id: 'rt-1' });
       jwt.signAsync
         .mockResolvedValueOnce('access-abc')
         .mockResolvedValueOnce('refresh-xyz');
@@ -109,6 +125,7 @@ describe('AuthService', () => {
       const { svc, prisma, jwt } = makeService();
       prisma.user.findUnique.mockResolvedValue(null);
       prisma.user.create.mockResolvedValue(fixedUser);
+      prisma.refreshToken.create.mockResolvedValue({ id: 'rt-1' });
       jwt.signAsync.mockResolvedValueOnce('a').mockResolvedValueOnce('r');
 
       await svc.register('a@b.com', 'pw', 'Nick');
@@ -136,6 +153,7 @@ describe('AuthService', () => {
       const bcrypt = await import('bcryptjs');
       const realHash = await bcrypt.hash('passw0rd!', 4);
       prisma.user.findUnique.mockResolvedValue({ ...fixedUser, passwordHash: realHash });
+      prisma.refreshToken.create.mockResolvedValue({ id: 'rt-1' });
       jwt.signAsync.mockResolvedValueOnce('access').mockResolvedValueOnce('refresh');
 
       const out = await svc.login('a@b.com', 'passw0rd!');
@@ -169,19 +187,32 @@ describe('AuthService', () => {
 
   describe('refresh()', () => {
     it('returns a fresh token pair when the refresh token is valid', async () => {
-      const { svc, jwt, config } = makeService();
+      const { svc, prisma, jwt } = makeService();
       jwt.verifyAsync.mockResolvedValue({
         sub: 'user-1',
         email: 'a@b.com',
         nickname: 'Tester',
+        jti: 'jti-refresh-1',
         type: 'refresh',
       });
+      prisma.refreshToken.findUnique.mockResolvedValue({
+        id: 'rt-1',
+        jti: 'jti-refresh-1',
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      });
+      prisma.refreshToken.update.mockResolvedValue({ id: 'rt-1', revokedAt: new Date() });
+      prisma.refreshToken.create.mockResolvedValue({ id: 'rt-2' });
       jwt.signAsync.mockResolvedValueOnce('new-access').mockResolvedValueOnce('new-refresh');
 
       const out = await svc.refresh('a-valid-refresh-token');
       expect(jwt.verifyAsync).toHaveBeenCalledWith(
         'a-valid-refresh-token',
-        expect.objectContaining({ secret: 'test-secret' }),
+        expect.objectContaining({ secret: 'test-refresh-secret' }),
+      );
+      expect(prisma.refreshToken.findUnique).toHaveBeenCalledWith({ where: { jti: 'jti-refresh-1' } });
+      expect(prisma.refreshToken.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'rt-1' }, data: { revokedAt: expect.any(Date) } }),
       );
       expect(jwt.signAsync).toHaveBeenCalledTimes(2);
       expect(out.accessToken).toBe('new-access');

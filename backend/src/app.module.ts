@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
@@ -22,6 +23,8 @@ import { QueueModule } from './modules/queue/queue.module';
 import { WsModule } from './modules/ws/ws.module';
 import { ExportModule } from './modules/export/export.module';
 import { PipelineModule } from './modules/pipeline/pipeline.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
+import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
 
 /**
  * Resolve the path to the optional `pino-pretty` binary. We wrap the lookup
@@ -63,6 +66,11 @@ function tryResolvePinoPrettyTarget():
         pinoHttp: {
           level: process.env.LOG_LEVEL || 'info',
           transport: tryResolvePinoPrettyTarget(),
+          // 脱敏：避免日志记录 token、cookie、密码等敏感信息
+          redact: {
+            paths: ['req.headers.authorization', 'req.headers.cookie', 'body.password', 'body.refreshToken'],
+            remove: true,
+          },
         },
       }),
     }),
@@ -85,7 +93,14 @@ function tryResolvePinoPrettyTarget():
     WsModule,
     ExportModule,
     PipelineModule,
+    MetricsModule,
   ],
   controllers: [HealthController],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
+    },
+  ],
 })
 export class AppModule {}

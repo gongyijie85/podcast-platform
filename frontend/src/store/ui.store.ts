@@ -30,11 +30,16 @@ interface UiState {
   // language
   language: Language;
   setLanguage: (l: Language) => void;
+  // elder mode (长辈模式：放大字号，提高对比度)
+  elderMode: boolean;
+  setElderMode: (b: boolean) => void;
+  toggleElderMode: () => void;
 }
 
 const THEME_KEY = 'ui.theme';
 const LANG_KEY = 'ui.language';
 const SIDEBAR_KEY = 'ui.sidebarCollapsed';
+const ELDER_KEY = 'ui.elderMode';
 
 const readTheme = (): ThemeMode => {
   const v = localStorageAdapter.get<string>(THEME_KEY);
@@ -44,6 +49,7 @@ const readLang = (): Language => {
   const v = localStorageAdapter.get<string>(LANG_KEY);
   return v === 'en-US' ? 'en-US' : 'zh-CN';
 };
+const readElder = (): boolean => localStorageAdapter.get<boolean>(ELDER_KEY) === true;
 
 const applyTheme = (mode: ThemeMode): void => {
   if (typeof document === 'undefined') return;
@@ -59,6 +65,13 @@ const applyLanguage = (lang: Language): void => {
   } catch {
     /* ignore */
   }
+};
+
+const applyElderMode = (on: boolean): void => {
+  if (typeof document === 'undefined') return;
+  // 字号放大 25%（1.25），MUI typography 基于 rem 会自动跟随
+  document.documentElement.style.setProperty('--font-scale', on ? '1.25' : '1');
+  document.documentElement.setAttribute('data-elder-mode', on ? 'on' : 'off');
 };
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -105,6 +118,19 @@ export const useUiStore = create<UiState>((set, get) => ({
     applyLanguage(l);
     set({ language: l });
   },
+
+  elderMode: readElder(),
+  setElderMode: (b) => {
+    localStorageAdapter.set(ELDER_KEY, b);
+    applyElderMode(b);
+    set({ elderMode: b });
+  },
+  toggleElderMode: () => {
+    const next = !get().elderMode;
+    localStorageAdapter.set(ELDER_KEY, next);
+    applyElderMode(next);
+    set({ elderMode: next });
+  },
 }));
 
 // Initial side-effects (run once when this module is first imported).
@@ -112,3 +138,5 @@ const initialTheme = readTheme();
 applyTheme(initialTheme);
 const initialLang = readLang();
 applyLanguage(initialLang);
+const initialElder = readElder();
+applyElderMode(initialElder);

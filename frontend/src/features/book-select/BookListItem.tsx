@@ -1,4 +1,4 @@
-import { Card, CardContent, CardActions, Typography, Button, Stack, Avatar, Box, IconButton, Tooltip } from '@mui/material';
+import { Card, CardContent, Typography, Stack, Avatar, Box, IconButton, Tooltip } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CloseIcon from '@mui/icons-material/Close';
 import type { BookMetadata } from '@shared/book';

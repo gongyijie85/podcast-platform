@@ -94,7 +94,6 @@ export async function runStep3(
       okCount += 1;
     } catch (e: unknown) {
       // Single-segment failure → silent fallback. Log but do NOT throw.
-      // eslint-disable-next-line no-console
       console.warn(
         `[pipeline/step3] segment ${i} TTS failed: ${e instanceof Error ? e.message : String(e)}`,
       );

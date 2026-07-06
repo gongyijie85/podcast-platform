@@ -16,7 +16,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   type SelectChangeEvent,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -36,6 +35,8 @@ export function Settings(): JSX.Element {
   const setTheme = useUiStore((s) => s.setTheme);
   const language = useUiStore((s) => s.language);
   const setLanguage = useUiStore((s) => s.setLanguage);
+  const elderMode = useUiStore((s) => s.elderMode);
+  const setElderMode = useUiStore((s) => s.setElderMode);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   // redirect to login if not authenticated
@@ -121,19 +122,28 @@ export function Settings(): JSX.Element {
               <FormControlLabel
                 control={
                   <Switch
+                    checked={elderMode}
+                    onChange={(e) => setElderMode(e.target.checked)}
+                  />
+                }
+                label={t('settings.elderMode')}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
                     checked={theme === 'dark'}
                     onChange={(e) => setTheme(e.target.checked ? 'dark' : 'light')}
                   />
                 }
-                label="启用深色模式"
+                label={t('settings.darkMode')}
               />
               <FormControlLabel
                 control={<Switch defaultChecked />}
-                label="生成完成时发送通知"
+                label={t('settings.notifyOnComplete')}
               />
               <FormControlLabel
                 control={<Switch defaultChecked />}
-                label="自动播放下一条 BGM"
+                label={t('settings.autoPlayBgm')}
               />
             </Stack>
           </CardContent>

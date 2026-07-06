@@ -16,6 +16,8 @@ export const configuration = () => ({
   logLevel: process.env.LOG_LEVEL || 'info',
   jwt: {
     secret: process.env.JWT_SECRET || 'change-me',
+    // 未设置时默认复用 JWT_SECRET，保持旧环境兼容；生产建议单独配置
+    refreshSecret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'change-me',
     accessExpires: process.env.JWT_ACCESS_EXPIRES || '15m',
     refreshExpires: process.env.JWT_REFRESH_EXPIRES || '7d',
   },
@@ -63,6 +65,12 @@ export const configuration = () => ({
       model: process.env.LLM_MODEL || process.env.DOUBAO_MODEL || 'mimo-v2.5-pro',
       maxCompletionTokens: parseInt(process.env.LLM_MAX_COMPLETION_TOKENS || '4096', 10),
       topP: parseFloat(process.env.LLM_TOP_P || '0.9'),
+    },
+    // 封面识别 LLM Vision (agnes-2.0-flash, 免费, OpenAI 兼容)
+    llmVision: {
+      endpoint: process.env.LLM_VISION_ENDPOINT || 'https://apihub.agnes-ai.com/v1',
+      apiKey: process.env.LLM_VISION_API_KEY || '',
+      model: process.env.LLM_VISION_MODEL || 'agnes-2.0-flash',
     },
     doubao: {
       apiKey: process.env.DOUBAO_API_KEY || '',
