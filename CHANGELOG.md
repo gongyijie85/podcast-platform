@@ -1,5 +1,88 @@
 # 播客平台 CHANGELOG
 
+## [0.6.2] - 2026-07-06
+
+### 修改时间
+- 2026-07-06（上海时间）
+
+### 优化：拍照找书快速定位
+
+#### ISBN 条码优先识别
+- `frontend/src/pages/ScanCover.tsx`：上传图片后先扫描 ISBN 条码，命中直接调用 `POST /books/cover/resolve-isbn` 解析，未命中再走封面视觉识别；取景提示和副标题明确引导拍摄书背面 ISBN 条码。
+- `frontend/src/utils/barcode-scanner.ts`：基于 `@zxing/browser` 读取条码。
+- `frontend/src/api/book.api.ts`：新增 `resolveCoverByIsbn(isbn)`。
+
+#### 就地手动搜索
+- `frontend/src/pages/ScanCover.tsx`：手动输入书名后直接在 `/scan` 页面显示候选，不再跳转 `/books`。
+- `backend/src/modules/book/book.controller.ts`：新增 `POST /books/cover/search` 端点，搜索本地书库 + Google Books。
+- `frontend/src/api/book.api.ts`：新增 `searchCoverCandidates(title)`。
+
+#### 最近识别历史
+- `frontend/src/utils/scan-history.ts`（新增）：localStorage 读写历史记录，最多保留 20 条，去重按时间倒序。
+- `frontend/src/pages/ScanCover.tsx`：识别成功后自动保存历史，页面展示历史快捷入口。
+
+#### 修复
+- `frontend/src/utils/barcode-scanner.ts`：修正 `@zxing/browser` 导入，使用 `BrowserMultiFormatOneDReader` 读取一维条码（ISBN/EAN-13），替代不存在的 `BrowserBarcodeReader` 和需要参数的基类 `BrowserCodeReader`。
+- `frontend/src/__tests__/scan-history.test.ts`：修复 `localStorageAdapter.set` 参数类型断言，消除 TS2571。
+
+#### 体验优化
+- `frontend/src/pages/ScanCover.tsx`：条码命中后按钮显示"已识别 ISBN：xxx"，条码未命中进入封面识别时显示"未识别到条码，正在识别封面..."，让用户明确当前处于哪一阶段。
+
+#### 验证结果
+| 检查项 | 命令 | 结果 |
+|--------|------|------|
+| 后端测试 | `pnpm --filter backend test` | all suites passed, all tests passed |
+| 后端 lint | `eslint . --ext .ts` | 0 errors, 0 warnings |
+| 后端构建 | `pnpm --filter backend build` | nest build passed |
+| 前端测试 | `pnpm --filter frontend test` | all suites passed, all tests passed |
+| 前端 lint | `eslint . --ext .ts,.tsx` | 0 errors, 0 warnings |
+| 前端构建 | `pnpm --filter frontend build` | tsc -b && vite build passed |
+
+#### 版本号
+- root / frontend / backend 统一升级到 `0.6.2`。
+
+---
+
+## [0.6.1] - 2026-07-06
+
+### 修改时间
+- 2026-07-06（上海时间）
+
+### 三端响应式布局优化（电脑 / 手机 / 平板）
+
+对前端核心页面进行电脑、手机、平板三端适配，优先解决布局问题，保持长辈模式兼容。
+
+#### 断点与布局
+- `frontend/src/hooks/useMediaQuery.ts`：自定义断点与 MUI 默认断点对齐（xs/sm/md/lg），新增 `useIsCompact` 用于紧凑模式判断。
+- `frontend/src/layouts/MainLayout.tsx`：平板自动折叠侧边栏；移动端 sidebar 改为 temporary drawer，避免挤压主内容。
+
+#### 页面响应式调整
+- `frontend/src/pages/BookDetail.tsx`：电脑端左右分栏（`xs={12} lg={6}`），移动端/平板单栏堆叠；封面尺寸响应式；生成/保存按钮 `xs:column / sm:row`。
+- `frontend/src/pages/ProjectDetail.tsx`：标题 `wordBreak: break-word` 防溢出；BGM 卡片按 `xs:1 / sm:2 / lg:3` 列数响应；下载按钮换行+响应式堆叠。
+- `frontend/src/pages/ScanCover.tsx`：拍照按钮移动端占满宽度；候选图书卡片 `xs:column / sm:row`，移动端封面更大、信息更清晰。
+- `frontend/src/pages/Dashboard.tsx`：移动端"新建项目"按钮占满宽度。
+- `frontend/src/pages/Projects.tsx`：栅格调整避免平板列数过密。
+- `frontend/src/features/book-organizer/BookOrganizer.tsx`：筛选区两栏断点调整；指标卡片响应式高度；操作按钮 `xs:column / md:row`。
+- `frontend/src/components/book/BookCard.tsx`：列表模式移动端垂直布局。
+
+#### 设计决策
+- 不新增页面范围，聚焦现有核心页面布局。
+- 统一使用 MUI 响应式 `sx` 属性，避免自定义断点与 MUI 断点混用。
+- 长辈模式基于 `rem` 的字号放大与响应式布局保持兼容。
+
+#### 验证结果
+
+| 检查项 | 命令 | 结果 |
+|--------|------|------|
+| 前端 lint | `pnpm exec eslint . --ext .ts,.tsx`（frontend 目录） | 0 errors, 0 warnings |
+| 前端测试 | `pnpm --filter frontend test` | 17 suites passed, 178 tests passed |
+| 前端构建 | `pnpm --filter frontend build` | tsc -b && vite build passed |
+
+#### 版本号
+- root / frontend / backend 统一升级到 `0.6.1`。
+
+---
+
 ## [0.6.0] - 2026-07-06
 
 ### 修改时间
