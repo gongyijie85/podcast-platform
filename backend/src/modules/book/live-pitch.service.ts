@@ -83,11 +83,14 @@ export class LivePitchService {
 
   /**
    * mock 兜底：基于元数据生成模板化口播稿
+   * 优先使用中文翻译字段，避免中英混杂。
    */
   private mockGenerate(book: BookLibraryItem): string {
-    const summary = (book.summary ?? '').replace(/\s+/g, ' ').trim();
-    const trimmedSummary = summary.length > 60 ? `${summary.slice(0, 60)}...` : summary || '一本值得阅读的好书';
-    const focus = book.author && book.author !== 'Unknown' ? `${book.author}的力作` : '这部作品';
-    return `今天给大家推荐《${book.title}》，${focus}。${trimmedSummary}适合喜欢深度阅读的朋友，无论通勤还是睡前都能轻松翻开。直播间限时优惠，点击购物车带回家。`;
+    const title = book.titleZh?.trim() || book.title;
+    const author = book.authorZh?.trim() || book.author;
+    const summary = (book.summaryZh ?? book.summary ?? '').replace(/\s+/g, ' ').trim();
+    const trimmedSummary = summary.length > 60 ? `${summary.slice(0, 60)}……` : summary || '一本值得阅读的好书';
+    const focus = author && author !== 'Unknown' ? `${author}的力作` : '这部作品';
+    return `今天给大家推荐《${title}》，${focus}。${trimmedSummary}适合喜欢深度阅读的朋友，无论通勤还是睡前都能轻松翻开。直播间限时优惠，点击购物车带回家。`;
   }
 }
