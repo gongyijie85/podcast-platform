@@ -131,7 +131,7 @@ export function BookDetail(): JSX.Element {
       </Button>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} lg={6}>
+        <Grid item xs={12}>
           <Card>
             <CardContent>
               <Stack spacing={2}>
@@ -197,6 +197,61 @@ export function BookDetail(): JSX.Element {
                   )}
                 </Box>
 
+                <Box component="section" aria-label="主播口播稿">
+                  <Stack spacing={2}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="h6" component="h2">
+                        {t('bookDetail.title')}
+                      </Typography>
+                      {book.livePitchGeneratedAt && (
+                        <Typography variant="caption" color="text.secondary">
+                          {t('bookDetail.generatedAt', {
+                            time: formatTime(book.livePitchGeneratedAt),
+                          })}
+                        </Typography>
+                      )}
+                    </Stack>
+                    <TextField
+                      multiline
+                      minRows={8}
+                      maxRows={20}
+                      fullWidth
+                      value={livePitch}
+                      onChange={(e) => setLivePitch(e.target.value)}
+                      placeholder="在此编辑主播口播稿，或点击 AI 生成"
+                      disabled={generating || saving}
+                      aria-label="主播口播稿编辑框"
+                    />
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1}
+                      alignItems={{ xs: 'stretch', sm: 'center' }}
+                    >
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<AutoFixHighIcon />}
+                        onClick={handleGenerate}
+                        disabled={generating || saving}
+                        fullWidth
+                        sx={{ width: { sm: 'auto' } }}
+                      >
+                        {generating ? t('bookDetail.generating') : t('bookDetail.generate')}
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        startIcon={<SaveIcon />}
+                        onClick={handleSave}
+                        disabled={generating || saving || !livePitch.trim()}
+                        fullWidth
+                        sx={{ width: { sm: 'auto' } }}
+                      >
+                        {saving ? t('bookDetail.saving') : t('bookDetail.save')}
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Box>
+
                 {(book.summaryZh || book.summary) && (
                   <Box component="section" aria-label="图书简介">
                     <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
@@ -230,61 +285,6 @@ export function BookDetail(): JSX.Element {
                     )}
                   </Box>
                 )}
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} lg={6}>
-          <Card>
-            <CardContent>
-              <Stack spacing={2}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="h6" component="h2">{t('bookDetail.title')}</Typography>
-                  {book.livePitchGeneratedAt && (
-                    <Typography variant="caption" color="text.secondary">
-                      {t('bookDetail.generatedAt', { time: formatTime(book.livePitchGeneratedAt) })}
-                    </Typography>
-                  )}
-                </Stack>
-                <TextField
-                  multiline
-                  minRows={8}
-                  maxRows={20}
-                  fullWidth
-                  value={livePitch}
-                  onChange={(e) => setLivePitch(e.target.value)}
-                  placeholder="在此编辑主播口播稿，或点击 AI 生成"
-                  disabled={generating || saving}
-                  aria-label="主播口播稿编辑框"
-                />
-                <Stack
-                  direction={{ xs: 'column', sm: 'row' }}
-                  spacing={1}
-                  alignItems={{ xs: 'stretch', sm: 'center' }}
-                >
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<AutoFixHighIcon />}
-                    onClick={handleGenerate}
-                    disabled={generating || saving}
-                    fullWidth
-                    sx={{ width: { sm: 'auto' } }}
-                  >
-                    {generating ? t('bookDetail.generating') : t('bookDetail.generate')}
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    startIcon={<SaveIcon />}
-                    onClick={handleSave}
-                    disabled={generating || saving || !livePitch.trim()}
-                    fullWidth
-                    sx={{ width: { sm: 'auto' } }}
-                  >
-                    {saving ? t('bookDetail.saving') : t('bookDetail.save')}
-                  </Button>
-                </Stack>
               </Stack>
             </CardContent>
           </Card>

@@ -93,6 +93,16 @@ describe('BookDetail', () => {
     expect(screen.getByDisplayValue('已有的口播稿')).toBeInTheDocument();
     expect(screen.getByText('AI 生成')).toBeInTheDocument();
     expect(screen.getByText('保存')).toBeInTheDocument();
+
+    const basicInfo = screen.getByLabelText('基本信息');
+    const livePitch = screen.getByLabelText('主播口播稿');
+    const summary = screen.getByLabelText('图书简介');
+    expect(
+      basicInfo.compareDocumentPosition(livePitch) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      livePitch.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('generates live pitch on button click', async () => {
