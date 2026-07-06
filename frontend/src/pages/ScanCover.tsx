@@ -110,7 +110,7 @@ export function ScanCover(): JSX.Element {
       // 1. 优先条码扫描（最快、最准）
       const isbn = await scanIsbnFromImage(file);
       if (isbn) {
-        setRawRecognition({ isbn, confidence: 'high' });
+        setRawRecognition({ title: '', isbn, confidence: 'high' });
         setStatus('recognizing');
         const result = await bookApi.resolveCoverByIsbn(isbn);
         setRawRecognition(result.rawRecognition);

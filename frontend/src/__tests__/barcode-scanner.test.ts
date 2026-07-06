@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 const decodeFromImageUrlMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@zxing/browser', () => ({
-  BrowserCodeReader: vi.fn().mockImplementation(() => ({
+  BrowserMultiFormatOneDReader: vi.fn().mockImplementation(() => ({
     decodeFromImageUrl: decodeFromImageUrlMock,
   })),
 }));

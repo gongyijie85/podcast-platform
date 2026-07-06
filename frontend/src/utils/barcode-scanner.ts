@@ -1,6 +1,6 @@
-import { BrowserCodeReader } from '@zxing/browser';
+import { BrowserMultiFormatOneDReader } from '@zxing/browser';
 
-const reader = new BrowserCodeReader();
+const reader = new BrowserMultiFormatOneDReader();
 
 /**
  * 从图片文件中尝试读取 ISBN/EAN-13 条码
