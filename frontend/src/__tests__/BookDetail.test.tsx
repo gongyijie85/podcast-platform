@@ -79,7 +79,7 @@ describe('BookDetail', () => {
     vi.spyOn(window, 'alert').mockImplementation(() => {});
   });
 
-  it('renders book detail and live pitch editor', async () => {
+  it('renders live pitch as text above basic information', async () => {
     mocks.getDetail.mockResolvedValueOnce(makeBook());
 
     renderDetail();
@@ -90,18 +90,19 @@ describe('BookDetail', () => {
     expect(screen.getByText('东野圭吾')).toBeInTheDocument();
     expect(screen.getByText(/ISBN：9787544291170/)).toBeInTheDocument();
     expect(screen.getByText('主播口播稿')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('已有的口播稿')).toBeInTheDocument();
+    expect(screen.getByText('已有的口播稿')).toBeInTheDocument();
+    expect(screen.queryByLabelText('主播口播稿编辑框')).not.toBeInTheDocument();
     expect(screen.getByText('AI 生成')).toBeInTheDocument();
-    expect(screen.getByText('保存')).toBeInTheDocument();
+    expect(screen.getByText('编辑')).toBeInTheDocument();
 
     const basicInfo = screen.getByLabelText('基本信息');
     const livePitch = screen.getByLabelText('主播口播稿');
     const summary = screen.getByLabelText('图书简介');
     expect(
-      basicInfo.compareDocumentPosition(livePitch) & Node.DOCUMENT_POSITION_FOLLOWING,
+      livePitch.compareDocumentPosition(basicInfo) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      livePitch.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING,
+      basicInfo.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
@@ -122,7 +123,7 @@ describe('BookDetail', () => {
     fireEvent.click(screen.getByText('AI 生成'));
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue('AI 生成的全新口播稿')).toBeInTheDocument();
+      expect(screen.getByText('AI 生成的全新口播稿')).toBeInTheDocument();
     });
     expect(mocks.generatePitch).toHaveBeenCalledWith('9787544291170');
   });
@@ -135,10 +136,9 @@ describe('BookDetail', () => {
 
     renderDetail();
 
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('已有的口播稿')).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText('已有的口播稿')).toBeInTheDocument());
 
+    fireEvent.click(screen.getByText('编辑'));
     const textarea = screen.getByDisplayValue('已有的口播稿') as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: '编辑后的口播稿' } });
     fireEvent.click(screen.getByText('保存'));
@@ -146,6 +146,8 @@ describe('BookDetail', () => {
     await waitFor(() => {
       expect(mocks.updatePitch).toHaveBeenCalledWith('9787544291170', '编辑后的口播稿');
     });
+    expect(screen.queryByLabelText('主播口播稿编辑框')).not.toBeInTheDocument();
+    expect(screen.getByText('编辑后的口播稿')).toBeInTheDocument();
     expect(window.alert).toHaveBeenCalledWith('口播稿已保存');
   });
 });
