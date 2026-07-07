@@ -152,6 +152,10 @@
     "title": "Scan cover to identify book",
     "subtitle": "Snap the ISBN barcode on the back cover during live stream, auto-load pitch script",
     "button": "Take photo / Upload cover",
+    "liveScan": "Scan barcode live",
+    "stopLiveScan": "Stop scanning",
+    "cameraStarting": "Starting camera...",
+    "cameraError": "Camera unavailable. Check permission or use photo recognition.",
     "recognizing": "Recognizing cover...",
     "compressing": "Compressing image...",
     "candidates": "Found {{count}} candidate books, please pick one",
@@ -167,6 +171,7 @@
     "tip": "Priority: shoot the ISBN barcode on the back cover for fastest and most accurate recognition; front cover works when barcode is unavailable",
     "recentHistory": "Recent scans",
     "clearHistory": "Clear history",
+    "historyEmpty": "No recent scans",
     "selectCandidate": "Select this book",
     "frameHint": "Point the ISBN barcode on the back cover at this area, keep it well-lit and clear",
     "lowConfidence": "Recognition is uncertain, please verify title and author before selecting"
