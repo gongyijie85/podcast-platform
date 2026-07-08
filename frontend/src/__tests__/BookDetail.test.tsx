@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   getDetail: vi.fn(),
   generatePitch: vi.fn(),
   updatePitch: vi.fn(),
+  updateEnrichment: vi.fn(),
+  generateEnrichment: vi.fn(),
 }));
 
 vi.mock('@/api/book.api', () => ({
@@ -13,6 +15,8 @@ vi.mock('@/api/book.api', () => ({
     getDetail: mocks.getDetail,
     generatePitch: mocks.generatePitch,
     updatePitch: mocks.updatePitch,
+    updateEnrichment: mocks.updateEnrichment,
+    generateEnrichment: mocks.generateEnrichment,
   },
 }));
 
@@ -56,6 +60,8 @@ function makeBook(overrides: Partial<BookLibraryItem> = {}): BookLibraryItem {
     metadataSyncError: null,
     livePitch: '已有的口播稿',
     livePitchGeneratedAt: now,
+    enrichment: null,
+    enrichmentUpdatedAt: null,
     firstSeenAt: now,
     lastSeenAt: now,
     queryCount: 5,
@@ -149,5 +155,56 @@ describe('BookDetail', () => {
     expect(screen.queryByLabelText('主播口播稿编辑框')).not.toBeInTheDocument();
     expect(screen.getByText('编辑后的口播稿')).toBeInTheDocument();
     expect(window.alert).toHaveBeenCalledWith('口播稿已保存');
+  });
+
+  it('renders enrichment summary when present', async () => {
+    mocks.getDetail.mockResolvedValueOnce(makeBook({
+      enrichment: {
+        ratings: [{ label: 'Goodreads', score: 4, count: 128823, source: 'goodreads', fetchedAt: now }],
+        reviewInsights: {
+          positives: ['真诚温暖', '适合青少年'],
+          concerns: ['节奏较慢'],
+          source: 'manual',
+          fetchedAt: now,
+        },
+        hostBriefZh: {
+          sellingPoints: ['青春成长', '双视角叙事'],
+          audience: ['亲子共读', '青少年读者'],
+          talkingAngles: ['从初恋误会切入'],
+        },
+      },
+    }));
+
+    renderDetail();
+
+    await waitFor(() => expect(screen.getByText('主播延展资料')).toBeInTheDocument());
+    expect(screen.getByText(/Goodreads 4/)).toBeInTheDocument();
+    expect(screen.getByText(/卖点：青春成长；双视角叙事/)).toBeInTheDocument();
+    expect(screen.getByText(/评价摘要：真诚温暖；适合青少年/)).toBeInTheDocument();
+  });
+
+  it('saves manual enrichment JSON', async () => {
+    mocks.getDetail.mockResolvedValueOnce(makeBook());
+    mocks.updateEnrichment.mockResolvedValueOnce(makeBook({
+      enrichment: {
+        manualNotes: 'Amazon 页面显示 Goodreads 4.0 分',
+        sources: [{ source: 'manual', fetchedAt: now }],
+      },
+    }));
+
+    renderDetail();
+
+    await waitFor(() => expect(screen.getByLabelText('主播延展资料编辑框')).toBeInTheDocument());
+    fireEvent.change(screen.getByPlaceholderText('{"manualNotes":"粘贴 Amazon/Goodreads 资料摘要"}'), {
+      target: { value: '{"manualNotes":"Amazon 页面显示 Goodreads 4.0 分"}' },
+    });
+    fireEvent.click(screen.getByText('保存延展资料'));
+
+    await waitFor(() => {
+      expect(mocks.updateEnrichment).toHaveBeenCalledWith('9787544291170', {
+        manualNotes: 'Amazon 页面显示 Goodreads 4.0 分',
+      });
+    });
+    expect(window.alert).toHaveBeenCalledWith('主播延展资料已保存');
   });
 });

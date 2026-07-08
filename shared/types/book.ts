@@ -13,6 +13,66 @@ export interface BookMetadata {
   authorZh?: string | null;
   publisherZh?: string | null;
   summaryZh?: string | null;
+  enrichment?: BookEnrichment | null;
+  enrichmentUpdatedAt?: string | null;
+}
+
+export type BookEnrichmentSource =
+  | 'googlebooks'
+  | 'openlibrary'
+  | 'bookrank'
+  | 'mock'
+  | 'amazon_creators'
+  | 'amazon_feedback'
+  | 'goodreads'
+  | 'browseract'
+  | 'manual';
+
+export interface BookEnrichmentSourceRef {
+  source: BookEnrichmentSource;
+  fetchedAt: string;
+  url?: string | null;
+  note?: string | null;
+}
+
+export interface BookEnrichmentRating extends BookEnrichmentSourceRef {
+  label: string;
+  score: number;
+  count?: number | null;
+}
+
+export interface BookEnrichmentRelatedBook extends BookEnrichmentSourceRef {
+  title: string;
+  author?: string | null;
+  isbn?: string | null;
+  asin?: string | null;
+  coverUrl?: string | null;
+  reasonZh?: string | null;
+}
+
+export interface BookEnrichmentReviewInsights {
+  positives: string[];
+  concerns: string[];
+  quotes?: string[];
+  source: BookEnrichmentSource;
+  fetchedAt: string;
+}
+
+export interface BookEnrichmentHostBriefZh {
+  sellingPoints: string[];
+  audience: string[];
+  talkingAngles: string[];
+  livePitch?: string | null;
+}
+
+export interface BookEnrichment {
+  ratings?: BookEnrichmentRating[];
+  productDetails?: Record<string, string | number | boolean | null>;
+  reviewInsights?: BookEnrichmentReviewInsights;
+  relatedBooks?: BookEnrichmentRelatedBook[];
+  hostBriefZh?: BookEnrichmentHostBriefZh;
+  sources?: BookEnrichmentSourceRef[];
+  manualNotes?: string | null;
 }
 
 export type BookMetadataSyncStatus = 'pending' | 'syncing' | 'synced' | 'partial' | 'failed';

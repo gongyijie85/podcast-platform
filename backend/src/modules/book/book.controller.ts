@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UploadedFile,
   UseInterceptors,
@@ -15,7 +16,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { BookService } from './book.service';
 import { BookRankImportDto, FetchMetadataDto, ResolveMetadataDto } from './dto/fetch-metadata.dto';
-import { UpdateBookDto } from './dto/update-book.dto';
+import { UpdateBookDto, UpdateBookEnrichmentDto } from './dto/update-book.dto';
 import { CoverRecognizeResultDto, type CoverRecognizeCandidate, type CoverRawRecognition } from './dto/cover-recognize.dto';
 import { TranslationService } from './translation.service';
 import { BookLibraryService } from './book-library.service';
@@ -23,10 +24,12 @@ import { BookLibrarySyncService } from './book-library-sync.service';
 import { CoverRecognizeService, type CoverRecognition } from './cover-recognize.service';
 import { GoogleBooksAdapter } from './adapters/google-books.adapter';
 import { LivePitchService } from './live-pitch.service';
+import { BookEnrichmentService } from './book-enrichment.service';
 import { Public } from '../auth/public.decorator';
 import { QueueService } from '../queue/queue.service';
 import type {
   BookLibraryItem,
+  BookEnrichment,
   BookLibraryListResult,
   BookLibrarySyncStartResult,
   BookLibrarySyncStatusResult,
@@ -51,6 +54,7 @@ export class BookController {
     private readonly googleBooks: GoogleBooksAdapter,
     @Inject(forwardRef(() => QueueService))
     private readonly queues: QueueService,
+    private readonly enrichment: BookEnrichmentService = undefined as never,
   ) {}
 
   @Public()
@@ -351,6 +355,27 @@ export class BookController {
       category,
       syncStatus,
     });
+  }
+
+  @Public()
+  @Get('books/library/:isbn/enrichment')
+  async getBookEnrichment(@Param('isbn') isbn: string): Promise<BookEnrichment | null> {
+    return this.enrichment.get(isbn);
+  }
+
+  @Public()
+  @Put('books/library/:isbn/enrichment')
+  async updateBookEnrichment(
+    @Param('isbn') isbn: string,
+    @Body() dto: UpdateBookEnrichmentDto,
+  ): Promise<BookLibraryItem> {
+    return this.enrichment.saveManual(isbn, dto.enrichment ?? {});
+  }
+
+  @Public()
+  @Post('books/library/:isbn/enrichment/generate')
+  async generateBookEnrichment(@Param('isbn') isbn: string): Promise<BookLibraryItem> {
+    return this.enrichment.generate(isbn);
   }
 
   @Public()

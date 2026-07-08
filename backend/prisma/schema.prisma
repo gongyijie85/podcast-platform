@@ -106,6 +106,8 @@ model BookLibraryItem {
   authorZh      String?  @map("author_zh")
   publisherZh   String?  @map("publisher_zh")
   summaryZh     String?  @db.Text @map("summary_zh")
+  enrichment    Json?
+  enrichmentUpdatedAt DateTime? @map("enrichment_updated_at")
   source        String
   category      String?
   categoryName  String?  @map("category_name")

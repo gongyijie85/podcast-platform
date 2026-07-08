@@ -88,6 +88,9 @@ export class LivePitchService {
   private mockGenerate(book: BookLibraryItem): string {
     const title = book.titleZh?.trim() || book.title;
     const author = book.authorZh?.trim() || book.author;
+    if (book.enrichment?.hostBriefZh?.livePitch?.trim()) {
+      return book.enrichment.hostBriefZh.livePitch.trim();
+    }
     const summary = (book.summaryZh ?? book.summary ?? '').replace(/\s+/g, ' ').trim();
     const trimmedSummary = summary.length > 60 ? `${summary.slice(0, 60)}……` : summary || '一本值得阅读的好书';
     const focus = author && author !== 'Unknown' ? `${author}的力作` : '这部作品';

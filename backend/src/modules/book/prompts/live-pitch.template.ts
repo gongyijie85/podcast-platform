@@ -35,11 +35,26 @@ export const LIVE_PITCH_USER_TEMPLATE = (book: BookMetadata): string => {
   const author = book.authorZh?.trim() || book.author;
   const publisher = book.publisherZh?.trim() || book.publisher || '暂无';
   const summary = book.summaryZh?.trim() || book.summary?.trim() || '暂无';
+  const enrichment = book.enrichment;
+  const ratings = (enrichment?.ratings ?? [])
+    .map((item) => `${item.label}：${item.score}分${item.count ? `，${item.count}条评价` : ''}`)
+    .join('；') || '暂无';
+  const positives = enrichment?.reviewInsights?.positives?.join('；') || '暂无';
+  const concerns = enrichment?.reviewInsights?.concerns?.join('；') || '暂无';
+  const sellingPoints = enrichment?.hostBriefZh?.sellingPoints?.join('；') || '暂无';
+  const audience = enrichment?.hostBriefZh?.audience?.join('；') || '暂无';
+  const angles = enrichment?.hostBriefZh?.talkingAngles?.join('；') || '暂无';
 
   return `中文书名：《${title}》
 作者：${author}
 出版社：${publisher}
 中文简介：${summary}
+评分背书：${ratings}
+主播卖点：${sellingPoints}
+适合人群：${audience}
+讲述角度：${angles}
+读者好评摘要：${positives}
+常见顾虑：${concerns}
 
-请根据以上中文图书信息，生成一段全中文直播口播稿。`;
+请根据以上中文图书信息和主播延展资料，生成一段全中文直播口播稿。没有资料的项目请自然跳过，不要编造。`;
 };
