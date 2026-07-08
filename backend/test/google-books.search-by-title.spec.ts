@@ -54,6 +54,12 @@ describe('GoogleBooksAdapter.searchByTitle', () => {
               publisher: 'Addison-Wesley',
               publishedDate: '2019',
               pageCount: 352,
+              averageRating: 4.5,
+              ratingsCount: 1234,
+              categories: ['Computers'],
+              previewLink: 'https://books.google.com/preview',
+              infoLink: 'https://books.google.com/info',
+              dimensions: { height: '24 cm', width: '18 cm' },
               industryIdentifiers: [
                 { type: 'ISBN_13', identifier: '9780135957059' },
                 { type: 'ISBN_10', identifier: '0135957052' },
@@ -83,6 +89,16 @@ describe('GoogleBooksAdapter.searchByTitle', () => {
       source: 'googlebooks',
     });
     expect(result[0].coverUrl).toMatch(/^https:\/\//);
+    expect(result[0].enrichment).toMatchObject({
+      ratings: [{ label: 'Google Books', score: 4.5, count: 1234, source: 'googlebooks' }],
+      productDetails: {
+        categories: 'Computers',
+        previewLink: 'https://books.google.com/preview',
+        infoLink: 'https://books.google.com/info',
+        height: '24 cm',
+        width: '18 cm',
+      },
+    });
   });
 
   it('limits to 5 results', async () => {

@@ -1,6 +1,7 @@
 import { request } from './client';
 import type {
   BookLibraryItem,
+  BookEnrichment,
   BookLibraryListResult,
   BookLibrarySyncStartResult,
   BookLibrarySyncStatusFilter,
@@ -76,6 +77,15 @@ export const bookApi = {
   },
   async updatePitch(isbn: string, livePitch: string): Promise<BookLibraryItem> {
     return request<BookLibraryItem>({ method: 'PATCH', url: `/books/library/${isbn}`, data: { livePitch } });
+  },
+  async getEnrichment(isbn: string): Promise<BookEnrichment | null> {
+    return request<BookEnrichment | null>({ method: 'GET', url: `/books/library/${isbn}/enrichment` });
+  },
+  async updateEnrichment(isbn: string, enrichment: BookEnrichment): Promise<BookLibraryItem> {
+    return request<BookLibraryItem>({ method: 'PUT', url: `/books/library/${isbn}/enrichment`, data: { enrichment } });
+  },
+  async generateEnrichment(isbn: string): Promise<BookLibraryItem> {
+    return request<BookLibraryItem>({ method: 'POST', url: `/books/library/${isbn}/enrichment/generate` });
   },
   async generatePitch(isbn: string): Promise<GenerateLivePitchResult> {
     return request<GenerateLivePitchResult>({ method: 'POST', url: `/books/library/${isbn}/pitch/generate` });

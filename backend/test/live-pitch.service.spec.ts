@@ -65,6 +65,26 @@ describe('LivePitchService', () => {
     expect(library.updateLivePitch).toHaveBeenCalledWith('9787544291170', expect.any(String));
   });
 
+  it('uses enrichment livePitch in mock mode when present', async () => {
+    config.get.mockReturnValue(undefined);
+    library.findByIsbn.mockResolvedValueOnce({
+      ...book,
+      enrichment: {
+        hostBriefZh: {
+          sellingPoints: ['暖心治愈'],
+          audience: ['通勤读者'],
+          talkingAngles: ['从烦恼切入'],
+          livePitch: '这是一段已经整理好的主播资料包口播。',
+        },
+      },
+    });
+
+    const result = await service().generate('9787544291170');
+
+    expect(result.livePitch).toBe('这是一段已经整理好的主播资料包口播。');
+    expect(library.updateLivePitch).toHaveBeenCalledWith('9787544291170', '这是一段已经整理好的主播资料包口播。');
+  });
+
   it('falls back to mock when LLM call fails', async () => {
     config.get.mockImplementation((key: string) => {
       if (key === 'thirdParty.llm.apiKey') return 'fake-key';

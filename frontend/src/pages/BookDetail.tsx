@@ -17,7 +17,7 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import SaveIcon from '@mui/icons-material/Save';
 import { useTranslation } from 'react-i18next';
 import { bookApi } from '@/api/book.api';
-import type { BookLibraryItem } from '@shared/book';
+import type { BookEnrichment, BookLibraryItem } from '@shared/book';
 
 const SOURCE_LABELS: Record<string, string> = {
   googlebooks: 'Google Books',
@@ -41,6 +41,14 @@ function formatTime(value: string | null | undefined): string {
   return d.toLocaleString('zh-CN', { hour12: false });
 }
 
+function stringifyEnrichment(value: BookEnrichment | null | undefined): string {
+  return JSON.stringify(value ?? { manualNotes: '' }, null, 2);
+}
+
+function listText(items: string[] | undefined): string {
+  return items?.filter(Boolean).join('；') || '暂无';
+}
+
 /**
  * 图书详情页：展示图书元数据与主播口播稿（AI 生成 + 手动编辑保存）。
  */
@@ -54,6 +62,9 @@ export function BookDetail(): JSX.Element {
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [enrichmentText, setEnrichmentText] = useState('');
+  const [savingEnrichment, setSavingEnrichment] = useState(false);
+  const [generatingEnrichment, setGeneratingEnrichment] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +75,7 @@ export function BookDetail(): JSX.Element {
         if (cancelled) return;
         setBook(data);
         setLivePitch(data?.livePitch ?? '');
+        setEnrichmentText(stringifyEnrichment(data?.enrichment));
       })
       .catch((err) => {
         console.error('getDetail failed:', err);
@@ -104,6 +116,37 @@ export function BookDetail(): JSX.Element {
       alert('保存失败，请稍后重试');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveEnrichment = async (): Promise<void> => {
+    setSavingEnrichment(true);
+    try {
+      const enrichment = JSON.parse(enrichmentText || '{}') as BookEnrichment;
+      const updated = await bookApi.updateEnrichment(isbn, enrichment);
+      setBook(updated);
+      setEnrichmentText(stringifyEnrichment(updated.enrichment));
+      alert('主播延展资料已保存');
+    } catch (err) {
+      console.error('updateEnrichment failed:', err);
+      alert('保存失败，请检查 JSON 格式');
+    } finally {
+      setSavingEnrichment(false);
+    }
+  };
+
+  const handleGenerateEnrichment = async (): Promise<void> => {
+    setGeneratingEnrichment(true);
+    try {
+      const updated = await bookApi.generateEnrichment(isbn);
+      setBook(updated);
+      setEnrichmentText(stringifyEnrichment(updated.enrichment));
+      alert('主播资料包已生成');
+    } catch (err) {
+      console.error('generateEnrichment failed:', err);
+      alert('生成资料包失败，请稍后重试');
+    } finally {
+      setGeneratingEnrichment(false);
     }
   };
 
@@ -292,6 +335,71 @@ export function BookDetail(): JSX.Element {
                     )}
                   </Box>
                 )}
+
+                <Box component="section" aria-label="主播延展资料">
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    主播延展资料
+                  </Typography>
+                  {book.enrichment?.ratings?.length ? (
+                    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
+                      {book.enrichment.ratings.map((item) => (
+                        <Chip
+                          key={`${item.source}-${item.label}`}
+                          size="small"
+                          label={`${item.label} ${item.score}${item.count ? `（${item.count}条）` : ''}`}
+                        />
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      暂无评分背书
+                    </Typography>
+                  )}
+                  <Typography variant="body2">
+                    卖点：{listText(book.enrichment?.hostBriefZh?.sellingPoints)}
+                  </Typography>
+                  <Typography variant="body2">
+                    适合人群：{listText(book.enrichment?.hostBriefZh?.audience)}
+                  </Typography>
+                  <Typography variant="body2">
+                    评价摘要：{listText(book.enrichment?.reviewInsights?.positives)}
+                  </Typography>
+                  {book.enrichment?.relatedBooks?.length ? (
+                    <Typography variant="body2">
+                      相关推荐：{book.enrichment.relatedBooks.map((item) => item.reasonZh ? `${item.title}（${item.reasonZh}）` : item.title).join('；')}
+                    </Typography>
+                  ) : null}
+                  <TextField
+                    multiline
+                    minRows={6}
+                    maxRows={16}
+                    fullWidth
+                    value={enrichmentText}
+                    onChange={(e) => setEnrichmentText(e.target.value)}
+                    placeholder='{"manualNotes":"粘贴 Amazon/Goodreads 资料摘要"}'
+                    aria-label="主播延展资料编辑框"
+                    sx={{ mt: 2 }}
+                    disabled={savingEnrichment || generatingEnrichment}
+                  />
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1 }}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<SaveIcon />}
+                      onClick={handleSaveEnrichment}
+                      disabled={savingEnrichment || generatingEnrichment}
+                    >
+                      {savingEnrichment ? '保存中...' : '保存延展资料'}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<AutoFixHighIcon />}
+                      onClick={handleGenerateEnrichment}
+                      disabled={savingEnrichment || generatingEnrichment}
+                    >
+                      {generatingEnrichment ? '生成中...' : '生成资料包'}
+                    </Button>
+                  </Stack>
+                </Box>
 
                 {(book.firstSeenAt || book.lastSeenAt) && (
                   <Box component="section" aria-label="入库信息">

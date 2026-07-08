@@ -133,6 +133,7 @@ export class BookService {
       publishedDate: primary.publishedDate ?? fallback.publishedDate ?? null,
       pageCount: primary.pageCount ?? fallback.pageCount ?? null,
       summary: this.hasFullSummary(primary) ? primary.summary : fallback.summary ?? primary.summary ?? null,
+      enrichment: primary.enrichment ?? fallback.enrichment ?? null,
     };
   }
 

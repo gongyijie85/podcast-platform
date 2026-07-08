@@ -335,4 +335,33 @@ describe('BookLibraryService', () => {
   it('updateLivePitch throws when book not found', async () => {
     await expect(service().updateLivePitch('9780000000002', '口播稿')).rejects.toThrow(/Book not found/);
   });
+
+  it('updateEnrichment stores manual enrichment and exposes it in detail DTO', async () => {
+    await service().upsertMany([
+      {
+        isbn: '9780375811746',
+        title: 'Flipped',
+        author: 'Wendelin Van Draanen',
+        summary: 'A coming-of-age story.',
+        source: 'googlebooks',
+      },
+    ]);
+
+    const updated = await service().updateEnrichment('9780375811746', {
+      ratings: [{ label: 'Goodreads', score: 4, count: 128823, source: 'goodreads', fetchedAt: now.toISOString() }],
+      reviewInsights: {
+        positives: ['真诚温暖'],
+        concerns: ['节奏较慢'],
+        source: 'manual',
+        fetchedAt: now.toISOString(),
+      },
+      sources: [{ source: 'manual', fetchedAt: now.toISOString() }],
+    });
+
+    expect(updated.enrichment).toMatchObject({
+      ratings: [{ label: 'Goodreads', score: 4, count: 128823, source: 'goodreads' }],
+      reviewInsights: { positives: ['真诚温暖'], concerns: ['节奏较慢'] },
+    });
+    expect(updated.enrichmentUpdatedAt).toBeTruthy();
+  });
 });

@@ -30,6 +30,13 @@ type GoogleVolumeInfo = {
   categories?: string[];
   previewLink?: string;
   infoLink?: string;
+  averageRating?: number;
+  ratingsCount?: number;
+  dimensions?: {
+    height?: string;
+    width?: string;
+    thickness?: string;
+  };
 };
 
 type GoogleVolume = {
@@ -196,12 +203,12 @@ export class GoogleBooksAdapter implements BookApiAdapter {
 
   private listFields(): string {
     return [
-      'items(id,volumeInfo(title,subtitle,authors,imageLinks/smallThumbnail,imageLinks/thumbnail,description,publisher,publishedDate,pageCount,industryIdentifiers,language,categories,previewLink,infoLink))',
+      'items(id,volumeInfo(title,subtitle,authors,imageLinks/smallThumbnail,imageLinks/thumbnail,description,publisher,publishedDate,pageCount,industryIdentifiers,language,categories,previewLink,infoLink,averageRating,ratingsCount,dimensions))',
     ].join(',');
   }
 
   private detailFields(): string {
-    return 'id,volumeInfo(title,subtitle,authors,imageLinks/smallThumbnail,imageLinks/thumbnail,description,publisher,publishedDate,pageCount,industryIdentifiers,language,categories,previewLink,infoLink)';
+    return 'id,volumeInfo(title,subtitle,authors,imageLinks/smallThumbnail,imageLinks/thumbnail,description,publisher,publishedDate,pageCount,industryIdentifiers,language,categories,previewLink,infoLink,averageRating,ratingsCount,dimensions)';
   }
 
   private pickBestVolume(isbn: string, items: GoogleVolume[]): GoogleVolume | null {
@@ -264,6 +271,38 @@ export class GoogleBooksAdapter implements BookApiAdapter {
       publishedDate: this.cleanNullable(vi.publishedDate),
       pageCount: typeof vi.pageCount === 'number' && vi.pageCount > 0 ? vi.pageCount : null,
       source: 'googlebooks',
+      enrichment: this.toEnrichment(vi),
+    };
+  }
+
+  private toEnrichment(vi: GoogleVolumeInfo): BookMetadata['enrichment'] {
+    const fetchedAt = new Date().toISOString();
+    const productDetails: Record<string, string | number | boolean | null> = {};
+    if (vi.categories?.length) productDetails.categories = vi.categories.join(', ');
+    if (vi.previewLink) productDetails.previewLink = vi.previewLink;
+    if (vi.infoLink) productDetails.infoLink = vi.infoLink;
+    if (vi.dimensions?.height) productDetails.height = vi.dimensions.height;
+    if (vi.dimensions?.width) productDetails.width = vi.dimensions.width;
+    if (vi.dimensions?.thickness) productDetails.thickness = vi.dimensions.thickness;
+
+    const ratings =
+      typeof vi.averageRating === 'number'
+        ? [
+            {
+              label: 'Google Books',
+              score: vi.averageRating,
+              count: vi.ratingsCount ?? null,
+              source: 'googlebooks' as const,
+              fetchedAt,
+            },
+          ]
+        : undefined;
+
+    if (!ratings && Object.keys(productDetails).length === 0) return null;
+    return {
+      ratings,
+      productDetails,
+      sources: [{ source: 'googlebooks', fetchedAt, url: vi.infoLink ?? vi.previewLink ?? null }],
     };
   }
 

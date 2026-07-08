@@ -5,6 +5,7 @@ import { BookRankAdapter, type BookRankMappedBook } from './adapters/bookrank.ad
 import { normalizeIsbn } from '../../common/utils/isbn';
 import type { BookTranslation } from './translation.service';
 import type {
+  BookEnrichment,
   BookLibraryItem,
   BookLibraryListResult,
   BookLibrarySyncStatusFilter,
@@ -118,6 +119,25 @@ export class BookLibraryService {
     return this.toDto(updated);
   }
 
+  async updateEnrichment(isbn: string, enrichment: BookEnrichment | null): Promise<BookLibraryItem> {
+    const normalized = normalizeIsbn(isbn);
+    if (!normalized) {
+      throw new Error(`Invalid ISBN: ${isbn}`);
+    }
+    const existing = await this.prisma.bookLibraryItem.findUnique({ where: { isbn: normalized } });
+    if (!existing) {
+      throw new Error(`Book not found: ${isbn}`);
+    }
+    const updated = await this.prisma.bookLibraryItem.update({
+      where: { isbn: normalized },
+      data: {
+        enrichment: this.toJson(enrichment),
+        enrichmentUpdatedAt: new Date(),
+      },
+    });
+    return this.toDto(updated);
+  }
+
   async upsertMany(
     books: Array<BookMetadata | BookRankMappedBook>,
     defaults: Partial<Pick<BookLibraryItem, 'category' | 'categoryName' | 'rank'>> = {},
@@ -203,6 +223,8 @@ export class BookLibraryService {
           ...('authorZh' in book && book.authorZh !== undefined ? { authorZh: this.cleanNullable(book.authorZh) } : {}),
           ...('publisherZh' in book && book.publisherZh !== undefined ? { publisherZh: this.cleanNullable(book.publisherZh) } : {}),
           ...('summaryZh' in book && book.summaryZh !== undefined ? { summaryZh: this.cleanNullable(book.summaryZh) } : {}),
+          ...('enrichment' in book && book.enrichment !== undefined ? { enrichment: this.toJson(book.enrichment) } : {}),
+          ...('enrichment' in book && book.enrichment ? { enrichmentUpdatedAt: new Date() } : {}),
           source: book.source,
           category,
           categoryName,
@@ -229,6 +251,8 @@ export class BookLibraryService {
         ...('authorZh' in book && book.authorZh !== undefined ? { authorZh: this.cleanNullable(book.authorZh) } : {}),
         ...('publisherZh' in book && book.publisherZh !== undefined ? { publisherZh: this.cleanNullable(book.publisherZh) } : {}),
         ...('summaryZh' in book && book.summaryZh !== undefined ? { summaryZh: this.cleanNullable(book.summaryZh) } : {}),
+        ...('enrichment' in book && book.enrichment !== undefined ? { enrichment: this.toJson(book.enrichment) } : {}),
+        ...('enrichment' in book && book.enrichment ? { enrichmentUpdatedAt: new Date() } : {}),
         ...(book.pageCount && !(preserveBookRank && existing.pageCount) ? { pageCount: book.pageCount } : {}),
         source: this.preferSource(existing.source, book.source),
         ...this.syncStatusPatch(book),
@@ -280,6 +304,8 @@ export class BookLibraryService {
     authorZh: string | null;
     publisherZh: string | null;
     summaryZh: string | null;
+    enrichment?: Prisma.JsonValue | null;
+    enrichmentUpdatedAt?: Date | null;
     source: string;
     category: string | null;
     categoryName: string | null;
@@ -311,6 +337,8 @@ export class BookLibraryService {
       authorZh: item.authorZh,
       publisherZh: item.publisherZh,
       summaryZh: item.summaryZh,
+      enrichment: this.toEnrichment(item.enrichment),
+      enrichmentUpdatedAt: item.enrichmentUpdatedAt?.toISOString() ?? null,
       source: this.toBookSource(item.source),
       category: item.category,
       categoryName: item.categoryName,
@@ -331,6 +359,15 @@ export class BookLibraryService {
     return value === 'openlibrary' || value === 'googlebooks' || value === 'mock' || value === 'bookrank'
       ? value
       : 'mock';
+  }
+
+  private toEnrichment(value: Prisma.JsonValue | null | undefined): BookEnrichment | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return value as unknown as BookEnrichment;
+  }
+
+  private toJson(value: BookEnrichment | null | undefined): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+    return value ? (value as Prisma.InputJsonValue) : Prisma.JsonNull;
   }
 
   private toSyncStatusFilter(value: string | null | undefined): BookLibrarySyncStatusFilter | null {

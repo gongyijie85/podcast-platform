@@ -142,6 +142,9 @@ export class BookLibrarySyncService {
           publisher: this.cleanNullable(meta.publisher) ?? item.publisher,
           publishedDate: this.cleanNullable(meta.publishedDate) ?? item.publishedDate,
           pageCount: meta.pageCount ?? item.pageCount,
+          ...('enrichment' in meta && meta.enrichment !== undefined
+            ? { enrichment: meta.enrichment as never, enrichmentUpdatedAt: new Date() }
+            : {}),
           source: meta.source,
           metadataSyncStatus,
           metadataSyncAttempts: { increment: 1 },
