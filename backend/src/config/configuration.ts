@@ -1,5 +1,10 @@
 // Centralized configuration. All env vars go through here.
-const redisUrl = process.env.REDIS_URL ? new URL(process.env.REDIS_URL) : null;
+const redisUrlValue =
+  process.env.REDIS_URL ||
+  process.env.REDIS_MASTER_URL ||
+  process.env.NF_NF_REDIS_REDIS_MASTER_URL ||
+  '';
+const redisUrl = redisUrlValue ? new URL(redisUrlValue) : null;
 const hasExternalStorageConfig = Boolean(process.env.MINIO_ENDPOINT || process.env.OSS_BUCKET);
 
 const parseIntEnv = (value: string | undefined, fallback: number): number => {
@@ -25,7 +30,7 @@ export const configuration = () => ({
     url: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/podcast',
   },
   redis: {
-    url: process.env.REDIS_URL || '',
+    url: redisUrlValue,
     host: process.env.REDIS_HOST || redisUrl?.hostname || 'localhost',
     port: parseIntEnv(process.env.REDIS_PORT || redisUrl?.port, 6379),
     username: process.env.REDIS_USERNAME || (redisUrl?.username ? decodeURIComponent(redisUrl.username) : undefined),
@@ -33,7 +38,9 @@ export const configuration = () => ({
     tls: process.env.REDIS_TLS === 'true' || redisUrl?.protocol === 'rediss:',
   },
   queue: {
-    mode: process.env.QUEUE_MODE || (process.env.REDIS_HOST || process.env.REDIS_URL ? 'redis' : 'local'),
+    mode:
+      process.env.QUEUE_MODE ||
+      (process.env.REDIS_HOST || redisUrlValue ? 'redis' : 'local'),
     enqueueTimeoutMs: parseIntEnv(process.env.QUEUE_ENQUEUE_TIMEOUT_MS, 3000),
   },
   storage: {
