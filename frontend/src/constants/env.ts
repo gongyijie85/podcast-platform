@@ -8,9 +8,14 @@ const positiveInt = (value: string | undefined, fallback: number): number => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
+const defaultWsUrl = (): string => {
+  if (typeof window === 'undefined') return 'ws://localhost:3001';
+  return window.location.origin;
+};
+
 export const ENV = {
   apiBaseUrl: normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL),
-  wsUrl: (import.meta.env.VITE_WS_URL as string) || 'ws://localhost:3001',
+  wsUrl: (import.meta.env.VITE_WS_URL as string) || defaultWsUrl(),
   defaultLang: (import.meta.env.VITE_DEFAULT_LANG as string) || 'zh-CN',
   maxBooks: parseInt((import.meta.env.VITE_MAX_BOOKS as string) || '20', 10),
   apiTimeoutMs: positiveInt(import.meta.env.VITE_API_TIMEOUT_MS as string | undefined, 90_000),

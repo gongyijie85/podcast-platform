@@ -1,0 +1,3 @@
+name = "podcast-platform-cn-free"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-07-06"
