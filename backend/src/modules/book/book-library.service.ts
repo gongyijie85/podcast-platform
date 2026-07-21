@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BookRankAdapter, type BookRankMappedBook } from './adapters/bookrank.adapter';
-import { normalizeIsbn } from '../../common/utils/isbn';
+import { isbnToIsbn13, normalizeIsbn } from '../../common/utils/isbn';
 import type { BookTranslation } from './translation.service';
 import type {
   BookEnrichment,
@@ -72,8 +72,19 @@ export class BookLibraryService {
   async findByIsbn(isbn: string): Promise<BookLibraryItem | null> {
     const normalized = normalizeIsbn(isbn);
     if (!normalized) return null;
-    const item = await this.prisma.bookLibraryItem.findUnique({ where: { isbn: normalized } });
-    return item ? this.toDto(item) : null;
+    const direct = await this.prisma.bookLibraryItem.findUnique({ where: { isbn: normalized } });
+    if (direct) return this.toDto(direct);
+
+    // Scanners may return ISBN-10 while the library stores the canonical ISBN-13.
+    if (normalized.length === 10) {
+      const isbn13 = isbnToIsbn13(normalized);
+      if (isbn13) {
+        const converted = await this.prisma.bookLibraryItem.findUnique({ where: { isbn: isbn13 } });
+        if (converted) return this.toDto(converted);
+      }
+    }
+
+    return null;
   }
 
   /**

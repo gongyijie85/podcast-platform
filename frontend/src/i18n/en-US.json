@@ -135,6 +135,7 @@
   },
   "bookLibrary": {
     "title": "Book library",
+    "scan": "Scan ISBN",
     "viewDetail": "View detail",
     "makePodcast": "Make podcast"
   },
@@ -149,6 +150,7 @@
     "back": "← Back to library"
   },
   "scan": {
+    "libraryHit": "Matched the project library",
     "title": "Scan cover to identify book",
     "subtitle": "Snap the ISBN barcode on the back cover during live stream, auto-load pitch script",
     "button": "Take photo / Upload cover",

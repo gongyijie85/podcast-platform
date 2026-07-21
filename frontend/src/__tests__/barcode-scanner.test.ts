@@ -64,6 +64,8 @@ describe('scanIsbnFromImage', () => {
     expect(normalizeIsbnBarcode('978-0-13-595705-9')).toBe('9780135957059');
     expect(normalizeIsbnBarcode('0-13-595705-2')).toBe('0135957052');
     expect(normalizeIsbnBarcode('12345')).toBeNull();
+    expect(normalizeIsbnBarcode('978-0-13-595705-8')).toBeNull();
+    expect(normalizeIsbnBarcode('979-0-00-000000-0')).toBeNull();
   });
 
   it('scans the environment camera and reports valid ISBN values', async () => {

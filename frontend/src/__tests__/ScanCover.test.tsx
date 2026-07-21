@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   recognizeCover: vi.fn(),
+  lookupLibraryByIsbn: vi.fn(),
   resolveCoverByIsbn: vi.fn(),
   searchCoverCandidates: vi.fn(),
 }));
@@ -20,6 +21,7 @@ const scanHistoryMock = vi.hoisted(() => ({
 vi.mock('@/api/book.api', () => ({
   bookApi: {
     recognizeCover: mocks.recognizeCover,
+    lookupLibraryByIsbn: mocks.lookupLibraryByIsbn,
     resolveCoverByIsbn: mocks.resolveCoverByIsbn,
     searchCoverCandidates: mocks.searchCoverCandidates,
   },
@@ -61,6 +63,7 @@ vi.mock('react-i18next', () => ({
         'scan.selectCandidate': '选择此书',
         'scan.frameHint': '请将书背面的 ISBN 条码对准此区域，保持光线充足、条码清晰',
         'scan.lowConfidence': '识别结果不确定',
+        'scan.libraryHit': '已命中项目书库',
         'scan.recentHistory': '最近识别',
         'scan.clearHistory': '清空历史',
         'common.search': '搜索',
@@ -90,6 +93,7 @@ describe('ScanCover', () => {
     scanIsbnMock.mockReset();
     startVideoScanMock.mockReset();
     scanHistoryMock.getScanHistory.mockReturnValue([]);
+    mocks.lookupLibraryByIsbn.mockResolvedValue(null);
     vi.spyOn(window, 'alert').mockImplementation(() => {});
   });
 
@@ -294,6 +298,32 @@ describe('ScanCover', () => {
     });
     expect(mocks.resolveCoverByIsbn).toHaveBeenCalledWith('9780135957059');
     expect(mocks.recognizeCover).not.toHaveBeenCalled();
+  });
+
+  it('uses the project library before external ISBN resolution', async () => {
+    mocks.lookupLibraryByIsbn.mockResolvedValueOnce({
+      isbn: '9780135957059',
+      title: 'The Pragmatic Programmer',
+      author: 'Andrew Hunt',
+      coverUrl: null,
+      summary: 'Local library copy',
+    });
+    scanIsbnMock.mockResolvedValue('9780135957059');
+
+    renderScan();
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      value: [new File(['fake'], 'cover.jpg', { type: 'image/jpeg' })],
+      writable: false,
+    });
+    fireEvent.change(input);
+
+    await waitFor(() => {
+      expect(screen.getByText('已命中项目书库')).toBeInTheDocument();
+    });
+    expect(mocks.lookupLibraryByIsbn).toHaveBeenCalledWith('9780135957059');
+    expect(mocks.resolveCoverByIsbn).not.toHaveBeenCalled();
   });
 
   it('falls back to cover recognition when barcode is not detected', async () => {

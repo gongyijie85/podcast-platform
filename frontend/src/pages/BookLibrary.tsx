@@ -1,5 +1,8 @@
 import { useNavigate } from 'react-router-dom';
+import { Button, Stack } from '@mui/material';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import { BookOrganizer } from '@/features/book-organizer/BookOrganizer';
+import { useTranslation } from 'react-i18next';
 
 /**
  * 选书库页面：复用 BookOrganizer 的 detailMode，
@@ -7,11 +10,19 @@ import { BookOrganizer } from '@/features/book-organizer/BookOrganizer';
  */
 export function BookLibrary(): JSX.Element {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   return (
-    <BookOrganizer
-      detailMode
-      onUseBook={(book) => navigate(`/books/${book.isbn}`)}
-    />
+    <Stack spacing={2}>
+      <Stack direction="row" justifyContent="flex-end">
+        <Button
+          variant="contained"
+          startIcon={<QrCodeScannerIcon />}
+          onClick={() => navigate('/scan')}
+        >
+          {t('bookLibrary.scan')}
+        </Button>
+      </Stack>
+      <BookOrganizer detailMode onUseBook={(book) => navigate(`/books/${book.isbn}`)} />
+    </Stack>
   );
 }
-

@@ -358,6 +358,12 @@ export class BookController {
   }
 
   @Public()
+  @Get('books/library/:isbn/lookup')
+  async lookupBookByIsbn(@Param('isbn') isbn: string): Promise<BookLibraryItem | null> {
+    return this.library.findByIsbn(isbn);
+  }
+
+  @Public()
   @Get('books/library/:isbn/enrichment')
   async getBookEnrichment(@Param('isbn') isbn: string): Promise<BookEnrichment | null> {
     return this.enrichment.get(isbn);

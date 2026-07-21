@@ -1,12 +1,13 @@
 import { BrowserMultiFormatOneDReader, type IScannerControls } from '@zxing/browser';
+import { normalizeIsbn } from './isbn';
 
 const reader = new BrowserMultiFormatOneDReader();
 
 export function normalizeIsbnBarcode(value: string): string | null {
   const normalized = value.replace(/[-\s]/g, '').trim().toUpperCase();
-  return /^(978|979)\d{10}$/.test(normalized) || /^\d{9}[\dX]$/.test(normalized)
-    ? normalized
-    : null;
+  if (!/^(?:\d{9}[\dX]|\d{13})$/.test(normalized)) return null;
+  if (normalized.length === 13 && !/^(978|979)/.test(normalized)) return null;
+  return normalizeIsbn(normalized);
 }
 
 /**

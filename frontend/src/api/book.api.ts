@@ -75,6 +75,9 @@ export const bookApi = {
   async getDetail(isbn: string): Promise<BookLibraryItem | null> {
     return request<BookLibraryItem | null>({ method: 'GET', url: `/books/library/${isbn}` });
   },
+  async lookupLibraryByIsbn(isbn: string): Promise<BookLibraryItem | null> {
+    return request<BookLibraryItem | null>({ method: 'GET', url: `/books/library/${isbn}/lookup` });
+  },
   async updatePitch(isbn: string, livePitch: string): Promise<BookLibraryItem> {
     return request<BookLibraryItem>({ method: 'PATCH', url: `/books/library/${isbn}`, data: { livePitch } });
   },

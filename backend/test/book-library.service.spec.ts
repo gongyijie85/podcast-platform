@@ -312,6 +312,42 @@ describe('BookLibraryService', () => {
     expect(result).toBeNull();
   });
 
+  it('findByIsbn resolves an ISBN-10 scan against a canonical ISBN-13 library record', async () => {
+    prisma.bookLibraryItem.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'lib-1',
+        isbn: '9780135957059',
+        title: 'The Pragmatic Programmer',
+        author: 'Andrew Hunt',
+        coverUrl: null,
+        summary: null,
+        publisher: 'Addison-Wesley',
+        publishedDate: '2019',
+        pageCount: 352,
+        source: 'googlebooks',
+        category: null,
+        categoryName: null,
+        rank: null,
+        queryCount: 1,
+        metadataSyncStatus: 'synced',
+        metadataSyncAttempts: 1,
+        metadataSyncedAt: now,
+        metadataSyncError: null,
+        livePitch: null,
+        livePitchGeneratedAt: null,
+        firstSeenAt: now,
+        lastSeenAt: now,
+      });
+
+    const result = await service().findByIsbn('0135957052');
+
+    expect(result).toMatchObject({ isbn: '9780135957059', title: 'The Pragmatic Programmer' });
+    expect(prisma.bookLibraryItem.findUnique).toHaveBeenNthCalledWith(2, {
+      where: { isbn: '9780135957059' },
+    });
+  });
+
   it('updateLivePitch updates livePitch and livePitchGeneratedAt', async () => {
     await service().upsertMany([
       {

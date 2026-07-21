@@ -41,6 +41,20 @@ describe('BookController.resolveCoverByIsbn', () => {
     await expect(controller.resolveCoverByIsbn('')).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('provides a database-only ISBN lookup for the scanner fast path', async () => {
+    const localBook = {
+      isbn: '9780135957059',
+      title: 'The Pragmatic Programmer',
+      author: 'Andrew Hunt',
+    };
+    library.findByIsbn.mockResolvedValue(localBook);
+
+    const controller = buildController();
+
+    await expect(controller.lookupBookByIsbn('9780135957059')).resolves.toEqual(localBook);
+    expect(googleBooks.fetchByIsbn).not.toHaveBeenCalled();
+  });
+
   it('returns local library candidate when isbn matches', async () => {
     library.findByIsbn.mockResolvedValue({
       isbn: '9780135957059',

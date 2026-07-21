@@ -135,6 +135,7 @@
   },
   "bookLibrary": {
     "title": "选书库",
+    "scan": "扫描 ISBN",
     "viewDetail": "查看详情",
     "makePodcast": "制作播客"
   },
@@ -149,6 +150,7 @@
     "back": "← 返回选书库"
   },
   "scan": {
+    "libraryHit": "已命中项目书库",
     "title": "拍摄封面识别图书",
     "subtitle": "直播时拍一下书背面的 ISBN 条码，自动显示口播稿",
     "button": "拍照 / 上传封面",

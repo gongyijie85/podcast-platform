@@ -22,6 +22,7 @@ import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import type { IScannerControls } from '@zxing/browser';
 import { useTranslation } from 'react-i18next';
 import { bookApi, type CoverRecognizeCandidate, type CoverRecognizeResult } from '@/api/book.api';
+import type { BookLibraryItem } from '@shared/book';
 import { scanIsbnFromImage, startIsbnVideoScan } from '@/utils/barcode-scanner';
 import {
   getScanHistory,
@@ -38,6 +39,23 @@ type Status =
   | 'success'
   | 'no-results'
   | 'error';
+
+function libraryItemToCandidate(item: BookLibraryItem): CoverRecognizeCandidate {
+  return {
+    isbn: item.isbn,
+    title: item.title,
+    author: item.author,
+    coverUrl: item.coverUrl ?? null,
+    summary: item.summary ?? null,
+    publisher: item.publisher ?? null,
+    publishedDate: item.publishedDate ?? null,
+    pageCount: item.pageCount ?? null,
+    titleZh: item.titleZh ?? null,
+    authorZh: item.authorZh ?? null,
+    publisherZh: item.publisherZh ?? null,
+    summaryZh: item.summaryZh ?? null,
+  };
+}
 
 /**
  * 用 Canvas 压缩图片，减少上传体积和 LLM token 消耗
@@ -104,6 +122,7 @@ export function ScanCover(): JSX.Element {
   const [manualTitle, setManualTitle] = useState('');
   const [isManualSearching, setIsManualSearching] = useState(false);
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
+  const [libraryHit, setLibraryHit] = useState(false);
   const [isLiveScanning, setIsLiveScanning] = useState(false);
   const [isCameraStarting, setIsCameraStarting] = useState(false);
 
@@ -138,6 +157,7 @@ export function ScanCover(): JSX.Element {
     setErrorMsg('');
     setCandidates([]);
     setRawRecognition(null);
+    setLibraryHit(false);
 
     try {
       // 1. 优先条码扫描（最快、最准）
@@ -145,7 +165,7 @@ export function ScanCover(): JSX.Element {
       if (isbn) {
         setRawRecognition({ title: '', isbn, confidence: 'high' });
         setStatus('recognizing');
-        const result = await bookApi.resolveCoverByIsbn(isbn);
+        const result = await resolveScannedIsbn(isbn);
         setRawRecognition(result.rawRecognition);
         if (result.candidates.length > 0) {
           setCandidates(result.candidates);
@@ -199,6 +219,7 @@ export function ScanCover(): JSX.Element {
     setErrorMsg('');
     setCandidates([]);
     setRawRecognition(null);
+    setLibraryHit(false);
 
     try {
       const result = await bookApi.searchCoverCandidates(trimmed);
@@ -235,7 +256,7 @@ export function ScanCover(): JSX.Element {
     setErrorMsg('');
 
     try {
-      const result = await bookApi.resolveCoverByIsbn(isbn);
+      const result = await resolveScannedIsbn(isbn);
       const first = result.candidates[0];
       if (!first) {
         setErrorMsg(t('scan.noResults'));
@@ -253,10 +274,31 @@ export function ScanCover(): JSX.Element {
     }
   };
 
+  const resolveScannedIsbn = async (isbn: string): Promise<CoverRecognizeResult> => {
+    const local = await bookApi.lookupLibraryByIsbn(isbn);
+    if (local) {
+      setLibraryHit(true);
+      const candidate = libraryItemToCandidate(local);
+      return {
+        candidates: [candidate],
+        rawRecognition: {
+          title: local.title,
+          author: local.author,
+          isbn: local.isbn,
+          confidence: 'high',
+        },
+      };
+    }
+
+    setLibraryHit(false);
+    return bookApi.resolveCoverByIsbn(isbn);
+  };
+
   const handleStartLiveScan = async (): Promise<void> => {
     stopLiveScan();
     setCandidates([]);
     setRawRecognition(null);
+    setLibraryHit(false);
     setErrorMsg('');
     setStatus('idle');
     setIsCameraStarting(true);
@@ -414,6 +456,9 @@ export function ScanCover(): JSX.Element {
                   <Alert severity="info" aria-label="识别结果">
                     {t('scan.candidates', { count: candidates.length })}
                   </Alert>
+                )}
+                {status === 'success' && libraryHit && (
+                  <Alert severity="success">{t('scan.libraryHit')}</Alert>
                 )}
                 {status === 'success' && rawRecognition?.confidence === 'low' && (
                   <Alert severity="warning">{t('scan.lowConfidence')}</Alert>
